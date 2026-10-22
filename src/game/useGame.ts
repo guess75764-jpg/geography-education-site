@@ -40,6 +40,7 @@ export function useGame(countries: Country[], cities: City[]) {
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [kind, setKind] = useState<QuestionKind>('country');
 
   const countryPool = useMemo(
     () => countries.filter((c) => !c.id.startsWith('x-') && geoArea(c.feature) >= MIN_COUNTRY_AREA),
@@ -52,6 +53,7 @@ export function useGame(countries: Country[], cities: City[]) {
       const cityQs: Question[] = shuffle(cities).map((city) => ({ kind: 'city', city }));
       const pool =
         kind === 'country' ? countryQs : kind === 'city' ? cityQs : shuffle([...countryQs.slice(0, count), ...cityQs.slice(0, count)]);
+      setKind(kind);
       setQuestions(pool.slice(0, count));
       setIndex(0);
       setScore(0);
@@ -106,6 +108,7 @@ export function useGame(countries: Country[], cities: City[]) {
 
   return {
     phase,
+    kind,
     current,
     index,
     total: questions.length,

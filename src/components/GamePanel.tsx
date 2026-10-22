@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CITY_TOLERANCE_KM, type GameState, type QuestionKind } from '../game/useGame';
 import type { Country } from '../types';
+import ScoreBoard from './ScoreBoard';
 
 interface Props {
   game: GameState;
@@ -56,6 +57,15 @@ export default function GamePanel({ game, countryById }: Props) {
         <p>
           {game.total}문제 중 {game.correctCount}문제 정답
         </p>
+        <ScoreBoard
+          result={{
+            score: game.score,
+            max_score: game.maxScore,
+            correct_count: game.correctCount,
+            total: game.total,
+            quiz_kind: game.kind,
+          }}
+        />
         <button className="primary" onClick={game.reset}>
           다시 하기
         </button>

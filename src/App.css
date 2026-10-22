@@ -120,3 +120,18 @@ button.primary { background: var(--primary); color: #fff; border: 0; border-radi
 .feedback.ok { background: #dcfce7; color: #166534; }
 .feedback.no { background: #fee2e2; color: #991b1b; }
 .big-score { font-size: 2.5rem; font-weight: 800; margin: 0; }
+
+/* ── 점수 저장 / 순위표 ── */
+.scoreboard { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.scoreboard h4 { margin: 8px 0 0; }
+.save-form { display: flex; gap: 8px; }
+.save-form input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.saved-msg { margin: 0; color: #166534; font-weight: 600; }
+.error { color: var(--wrong); margin: 0; }
+.ranking { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ranking li { display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-radius: 8px; background: #f8fafc; }
+.ranking li.me { background: #dbeafe; font-weight: 700; }
+.ranking .rank { width: 1.5em; font-weight: 800; color: var(--muted); }
+.ranking .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking .pts { font-weight: 700; color: var(--primary); }

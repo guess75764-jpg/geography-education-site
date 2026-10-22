@@ -10,6 +10,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "d3-geo": "^3.1.1",
     "d3-selection": "^3.0.0",
     "d3-transition": "^3.0.1",
