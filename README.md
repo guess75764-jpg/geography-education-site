@@ -8,7 +8,11 @@
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # 배포용 정적 파일 → dist/
+npm run build:html  # HTML 파일 하나로 묶기 → dist-single/index.html
 ```
+
+`build:html` 로 만든 파일은 지도·캐릭터 이미지까지 모두 들어 있어, 인터넷 없이 더블클릭만으로 실행됩니다
+(점수 저장·랭킹만 인터넷이 필요). 학교 컴퓨터에 복사하거나 메신저로 나눠 주기 좋습니다.
 
 ## 점수 저장 (Supabase) 설정
 
