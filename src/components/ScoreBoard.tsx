@@ -70,7 +70,8 @@ export default function ScoreBoard({ result }: { result: Omit<NewScore, 'nicknam
       {status !== 'saved' ? (
         <form className="save-form" onSubmit={submit}>
           <input
-            placeholder="닉네임 (최대 20자)"
+            placeholder="별명 (최대 20자)"
+            aria-describedby="nickname-hint"
             maxLength={20}
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
@@ -80,9 +81,15 @@ export default function ScoreBoard({ result }: { result: Omit<NewScore, 'nicknam
             {status === 'saving' ? '저장 중…' : '점수 저장'}
           </button>
         </form>
-      ) : (
-        <p className="saved-msg">✅ 점수를 저장했어요!</p>
+      ) : null}
+      {status !== 'saved' && (
+        <p id="nickname-hint" className="hint small">
+          🔒 실명 대신 별명을 써 주세요. 입력한 이름은 순위표에 모두에게 보여요.
+        </p>
       )}
+      {status === 'saved' ? (
+        <p className="saved-msg">✅ 점수를 저장했어요!</p>
+      ) : null}
       {error && <p className="error small">{error}</p>}
 
       <h4>

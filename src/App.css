@@ -135,3 +135,4 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .ranking .rank { width: 1.5em; font-weight: 800; color: var(--muted); }
 .ranking .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranking .pts { font-weight: 700; color: var(--primary); }
+.hint { margin: 0; color: #92400e; background: #fef3c7; border-radius: 6px; padding: 6px 10px; }
