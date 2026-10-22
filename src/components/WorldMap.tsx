@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { geoArea, geoGraticule10, geoNaturalEarth1, geoPath, type GeoPath } from 'd3-geo';
+import { geoArea, geoGraticule10, geoMercator, geoPath, type GeoPath } from 'd3-geo';
 import { pointer, select } from 'd3-selection';
 import { zoom, zoomIdentity, type ZoomBehavior, type ZoomTransform } from 'd3-zoom';
 import 'd3-transition'; // selection.transition() 을 활성화
@@ -7,8 +7,27 @@ import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import type { Country, HighlightMap } from '../types';
 
 // SVG 내부 좌표계 크기. 실제 화면 크기는 CSS(width:100%)로 맞춘다.
+// 메르카토르 도법은 극으로 갈수록 끝없이 늘어나므로, 학교 지도처럼 위도 범위를 잘라서 보여준다.
+export const MAP_NORTH = 84; // 그린란드 북쪽 끝까지
+export const MAP_SOUTH = -58; // 남아메리카 남쪽 끝 아래 (남극 대륙은 표시하지 않음)
 const WIDTH = 960;
-const HEIGHT = 500;
+
+/** 가로 폭이 WIDTH 인 메르카토르 투영을 만들고, 잘라낸 지도의 높이를 함께 돌려준다. */
+function makeProjection() {
+  const projection = geoMercator()
+    .scale(WIDTH / (2 * Math.PI)) // 경도 360° = 가로 폭
+    .translate([WIDTH / 2, 0]);
+  const top = projection([0, MAP_NORTH])![1];
+  projection.translate([WIDTH / 2, -top]); // 북쪽 끝이 y=0 이 되도록
+  const height = Math.round(projection([0, MAP_SOUTH])![1]);
+  projection.clipExtent([
+    [0, 0],
+    [WIDTH, height],
+  ]);
+  return { projection, height };
+}
+
+const { height: HEIGHT } = makeProjection();
 const MAX_FOCUS_ZOOM = 8;
 // 기본값을 매번 새로 만들지 않도록 (memo 된 레이어가 불필요하게 다시 그려지는 것 방지)
 const NO_HIGHLIGHTS: HighlightMap = {};
@@ -70,9 +89,9 @@ export default function WorldMap({
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  // 투영법: Natural Earth (교육용 세계지도에 흔히 쓰이는 왜곡 적은 도법)
+  // 투영법: 메르카토르 (교실 벽걸이 지도에 흔한 도법. 고위도일수록 실제보다 크게 보인다)
   const { projection, path } = useMemo(() => {
-    const projection = geoNaturalEarth1().fitSize([WIDTH, HEIGHT], { type: 'Sphere' });
+    const { projection } = makeProjection();
     return { projection, path: geoPath(projection) };
   }, []);
 

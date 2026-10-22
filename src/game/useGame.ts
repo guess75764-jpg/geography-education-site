@@ -22,6 +22,8 @@ const EARTH_RADIUS_KM = 6371;
 export const CITY_TOLERANCE_KM = 500;
 /** 클릭하기 어려운 아주 작은 나라는 출제에서 제외 (스테라디안 단위, 약 1.2만 km²) */
 const MIN_COUNTRY_AREA = 0.0003;
+/** 지도에서 잘려 보이지 않는 남극 대륙은 출제하지 않는다 */
+const EXCLUDED_COUNTRY_IDS = new Set(['010']);
 const POINTS_PER_QUESTION = 10;
 
 function shuffle<T>(arr: T[]): T[] {
@@ -43,7 +45,9 @@ export function useGame(countries: Country[], cities: City[]) {
   const [kind, setKind] = useState<QuestionKind>('country');
 
   const countryPool = useMemo(
-    () => countries.filter((c) => !c.id.startsWith('x-') && geoArea(c.feature) >= MIN_COUNTRY_AREA),
+    () => countries.filter(
+        (c) => !c.id.startsWith('x-') && !EXCLUDED_COUNTRY_IDS.has(c.id) && geoArea(c.feature) >= MIN_COUNTRY_AREA,
+      ),
     [countries],
   );
 
