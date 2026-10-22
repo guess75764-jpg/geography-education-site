@@ -1,0 +1,122 @@
+:root {
+  --bg: #f4f6fb;
+  --panel: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+
+  --ocean: #dbeafe;
+  --land: #ffffff; /* 백지도 */
+  --land-border: #94a3b8;
+  --land-hover: #eef2ff;
+  --selected: #3b82f6;
+  --correct: #22c55e;
+  --wrong: #ef4444;
+  --city: #f59e0b;
+
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button { font: inherit; cursor: pointer; }
+
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── 상단 바 ── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 24px; background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.topbar h1 { font-size: 1.3rem; margin: 0; }
+.tabs { display: flex; gap: 8px; }
+.tabs button {
+  border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 8px 16px;
+}
+.tabs button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ── 본문 레이아웃: 지도 + 사이드 패널 ── */
+.layout {
+  flex: 1; display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 16px;
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  .topbar { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── 지도 ── */
+.map-wrap { position: relative; background: var(--panel); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.world-map { display: block; width: 100%; height: auto; cursor: grab; touch-action: none; }
+.world-map:active { cursor: grabbing; }
+.sphere { fill: var(--ocean); }
+.graticule { fill: none; stroke: #bfdbfe; stroke-width: 0.5; vector-effect: non-scaling-stroke; }
+.country {
+  fill: var(--land); stroke: var(--land-border); stroke-width: 0.5;
+  vector-effect: non-scaling-stroke; /* 확대해도 경계선 두께 유지 */
+  transition: fill 0.2s;
+}
+.country:hover { fill: var(--land-hover); }
+.country.selected { fill: var(--selected); }
+.country.correct { fill: var(--correct); }
+.country.wrong { fill: var(--wrong); }
+
+.marker circle { stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: pointer; }
+.marker text { text-anchor: middle; font-weight: 700; paint-order: stroke; stroke: #fff; stroke-width: 3px; vector-effect: non-scaling-stroke; pointer-events: none; }
+.marker-city circle { fill: var(--city); }
+.marker-selected circle { fill: #dc2626; }
+.marker-correct circle { fill: var(--correct); }
+.marker-wrong circle { fill: var(--wrong); }
+
+.map-tooltip {
+  position: absolute; top: 12px; left: 12px; padding: 6px 12px; border-radius: 8px;
+  background: rgba(17, 24, 39, 0.85); color: #fff; font-weight: 600; pointer-events: none;
+}
+.map-hint { position: absolute; bottom: 8px; right: 12px; font-size: 0.75rem; color: var(--muted); }
+
+/* ── 사이드 패널 ── */
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px; align-self: start; }
+.panel h2 { margin: 0; font-size: 1.2rem; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+
+.search { position: relative; }
+.search input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.search-results { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: 8px; position: absolute; inset-inline: 0; background: var(--panel); z-index: 10; }
+.search-results button { width: 100%; text-align: left; background: none; border: 0; padding: 8px; border-radius: 6px; display: flex; gap: 8px; align-items: center; }
+.search-results button:hover { background: var(--land-hover); }
+
+.tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.tag-country { background: #dbeafe; color: #1d4ed8; }
+.tag-city { background: #fef3c7; color: #b45309; }
+
+.info-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.info-card.empty { color: var(--muted); text-align: center; }
+.info-card h3 { margin: 0; font-size: 1.4rem; }
+.info-card h4 { margin: 12px 0 6px; }
+.info-card p { margin: 4px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 4px 10px; }
+.chip.active { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+button.link { background: none; border: 0; color: var(--primary); padding: 4px 0; text-align: left; }
+button.primary { background: var(--primary); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
+
+.field { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+.field select { padding: 8px; border-radius: 8px; border: 1px solid var(--border); font: inherit; }
+.segmented { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.segmented button { flex: 1; border: 0; background: #fff; padding: 8px; }
+.segmented button.active { background: var(--primary); color: #fff; }
+
+.game-status { display: flex; justify-content: space-between; font-weight: 600; }
+.score { color: var(--primary); }
+.question { background: #f8fafc; border-radius: 10px; padding: 14px; }
+.question p { margin: 8px 0 0; font-size: 1.1rem; }
+.question strong { font-size: 1.5rem; }
+.feedback { border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.feedback p { margin: 0; }
+.feedback.ok { background: #dcfce7; color: #166534; }
+.feedback.no { background: #fee2e2; color: #991b1b; }
+.big-score { font-size: 2.5rem; font-weight: 800; margin: 0; }
