@@ -1,66 +1,146 @@
 import { useMemo, useState } from 'react';
-import type { City, Country } from '../types';
+import { colorAt } from '../data/palette';
+import type { City, Country, LearnView } from '../types';
 
 interface Props {
+  view: LearnView;
+  onViewChange: (v: LearnView) => void;
   countries: Country[];
   cities: City[];
-  selectedCountry: Country | null;
-  selectedCity: City | null;
-  onSelectCountry: (c: Country | null) => void;
-  onSelectCity: (c: City) => void;
+  countryById: Map<string, Country>;
+  selectedCountryIds: string[];
+  selectedCityIds: string[];
+  onToggleCountry: (id: string) => void;
+  onToggleCity: (id: string) => void;
+  onClear: () => void;
+  onShowAll: () => void;
 }
 
-type SearchItem = { type: 'country'; item: Country } | { type: 'city'; item: City };
-
 export default function LearnPanel({
+  view,
+  onViewChange,
   countries,
   cities,
-  selectedCountry,
-  selectedCity,
-  onSelectCountry,
-  onSelectCity,
+  countryById,
+  selectedCountryIds,
+  selectedCityIds,
+  onToggleCountry,
+  onToggleCity,
+  onClear,
+  onShowAll,
 }: Props) {
   const [query, setQuery] = useState('');
+  const isCountry = view === 'country';
+  const selectedIds = isCountry ? selectedCountryIds : selectedCityIds;
+  const toggle = isCountry ? onToggleCountry : onToggleCity;
 
-  // 한국어/영어 이름으로 국가와 도시를 함께 검색
-  const results = useMemo<SearchItem[]>(() => {
+  // 지금 보고 있는 지도 종류만 한국어/영어 이름으로 검색
+  const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    const match = (ko: string, en: string) => ko.toLowerCase().includes(q) || en.toLowerCase().includes(q);
-    return [
-      ...countries.filter((c) => match(c.nameKo, c.nameEn)).map((item) => ({ type: 'country' as const, item })),
-      ...cities.filter((c) => match(c.nameKo, c.nameEn)).map((item) => ({ type: 'city' as const, item })),
-    ].slice(0, 8);
-  }, [query, countries, cities]);
+    const pool: (Country | City)[] = isCountry ? countries : cities;
+    return pool
+      .filter((c) => c.nameKo.toLowerCase().includes(q) || c.nameEn.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [query, isCountry, countries, cities]);
 
-  const citiesInCountry = selectedCountry ? cities.filter((c) => c.countryId === selectedCountry.id) : [];
-
-  const pick = (r: SearchItem) => {
-    if (r.type === 'country') onSelectCountry(r.item);
-    else onSelectCity(r.item);
+  const pick = (id: string) => {
+    toggle(id);
     setQuery('');
   };
+
+  const cityById = useMemo(() => new Map(cities.map((c) => [c.id, c])), [cities]);
+  const selectedItems = selectedIds
+    .map((id) => (isCountry ? countryById.get(id) : cityById.get(id)))
+    .filter((x): x is Country | City => !!x);
+
+  // 도시 목록은 나라 이름 순으로 정렬
+  const sortedCities = useMemo(
+    () =>
+      [...cities].sort(
+        (a, b) =>
+          (countryById.get(a.countryId)?.nameKo ?? '').localeCompare(countryById.get(b.countryId)?.nameKo ?? '', 'ko') ||
+          a.nameKo.localeCompare(b.nameKo, 'ko'),
+      ),
+    [cities, countryById],
+  );
 
   return (
     <aside className="panel">
       <h2>학습 모드</h2>
-      <p className="muted">나라나 도시를 검색하거나 지도에서 직접 클릭해 보세요.</p>
+
+      <div className="segmented" role="tablist" aria-label="지도 종류">
+        <button role="tab" aria-selected={isCountry} className={isCountry ? 'active' : ''} onClick={() => onViewChange('country')}>
+          🗺️ 국가 지도
+        </button>
+        <button role="tab" aria-selected={!isCountry} className={!isCountry ? 'active' : ''} onClick={() => onViewChange('city')}>
+          📍 도시 지도
+        </button>
+      </div>
+
+      <p className="muted small">
+        {isCountry ? '나라' : '도시'}를 검색하거나 지도에서 클릭하면 색칠돼요. 여러 개를 함께 고를 수 있고, 다시 누르면 해제돼요.
+      </p>
 
       <div className="search">
         <input
           type="search"
-          placeholder="예: 프랑스, 도쿄, Brazil"
+          placeholder={isCountry ? '예: 프랑스, Brazil' : '예: 도쿄, Paris'}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && results[0] && pick(results[0])}
+          onKeyDown={(e) => e.key === 'Enter' && results[0] && pick(results[0].id)}
         />
         {results.length > 0 && (
           <ul className="search-results">
-            {results.map((r) => (
-              <li key={`${r.type}-${r.item.id}`}>
-                <button onClick={() => pick(r)}>
-                  <span className={`tag tag-${r.type}`}>{r.type === 'country' ? '국가' : '도시'}</span>
-                  {r.item.nameKo} <span className="muted">{r.item.nameEn}</span>
+            {results.map((r) => {
+              const on = selectedIds.includes(r.id);
+              const country = 'countryId' in r ? countryById.get(r.countryId) : null;
+              return (
+                <li key={r.id}>
+                  <button onClick={() => pick(r.id)}>
+                    <span className={`tag tag-${view}`}>{on ? '✓ 선택됨' : isCountry ? '국가' : '도시'}</span>
+                    {r.nameKo}
+                    <span className="muted">{country ? country.nameKo : r.nameEn}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="info-card">
+        <div className="selected-head">
+          <h4>
+            선택한 {isCountry ? '나라' : '도시'} <span className="muted">{selectedItems.length}개</span>
+          </h4>
+          {selectedItems.length > 0 && (
+            <div className="selected-actions">
+              <button className="link" onClick={onShowAll}>
+                모두 보기
+              </button>
+              <button className="link danger" onClick={onClear}>
+                전체 해제
+              </button>
+            </div>
+          )}
+        </div>
+        {selectedItems.length === 0 ? (
+          <p className="muted small">아직 선택한 {isCountry ? '나라' : '도시'}가 없어요.</p>
+        ) : (
+          <ul className="selected-list">
+            {selectedItems.map((item, i) => (
+              <li key={item.id}>
+                <span className="swatch" style={{ background: colorAt(i) }} />
+                <span className="sel-name">
+                  {item.nameKo}
+                  <span className="muted small">
+                    {' '}
+                    {'countryId' in item ? countryById.get(item.countryId)?.nameKo ?? '' : item.nameEn}
+                  </span>
+                </span>
+                <button className="remove" aria-label={`${item.nameKo} 선택 해제`} onClick={() => toggle(item.id)}>
+                  ×
                 </button>
               </li>
             ))}
@@ -68,37 +148,26 @@ export default function LearnPanel({
         )}
       </div>
 
-      {selectedCountry ? (
-        <div className="info-card">
-          <h3>{selectedCountry.nameKo}</h3>
-          <p className="muted">{selectedCountry.nameEn}</p>
-          {selectedCity && (
-            <p>
-              📍 선택한 도시: <strong>{selectedCity.nameKo}</strong>
-            </p>
-          )}
-          {citiesInCountry.length > 0 && (
-            <>
-              <h4>주요 도시</h4>
-              <div className="chips">
-                {citiesInCountry.map((c) => (
-                  <button
-                    key={c.id}
-                    className={`chip ${selectedCity?.id === c.id ? 'active' : ''}`}
-                    onClick={() => onSelectCity(c)}
-                  >
-                    {c.nameKo}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          <button className="link" onClick={() => onSelectCountry(null)}>
-            선택 해제 · 전체 지도 보기
-          </button>
+      {!isCountry && (
+        <div>
+          <h4 className="list-title">도시 목록</h4>
+          <div className="chips city-chips">
+            {sortedCities.map((c) => {
+              const idx = selectedCityIds.indexOf(c.id);
+              return (
+                <button
+                  key={c.id}
+                  className={`chip ${idx >= 0 ? 'active' : ''}`}
+                  style={idx >= 0 ? { background: colorAt(idx), borderColor: colorAt(idx) } : undefined}
+                  title={countryById.get(c.countryId)?.nameKo}
+                  onClick={() => onToggleCity(c.id)}
+                >
+                  {c.nameKo}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      ) : (
-        <div className="info-card empty">아직 선택한 나라가 없어요.</div>
       )}
     </aside>
   );

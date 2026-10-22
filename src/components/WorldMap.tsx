@@ -9,13 +9,20 @@ import type { Country, HighlightMap } from '../types';
 // SVG 내부 좌표계 크기. 실제 화면 크기는 CSS(width:100%)로 맞춘다.
 const WIDTH = 960;
 const HEIGHT = 500;
+const MAX_FOCUS_ZOOM = 8;
+// 기본값을 매번 새로 만들지 않도록 (memo 된 레이어가 불필요하게 다시 그려지는 것 방지)
+const NO_HIGHLIGHTS: HighlightMap = {};
+const NO_FILLS: Record<string, string> = {};
+const NO_MARKERS: MapMarker[] = [];
 
 export interface MapMarker {
   id: string;
   lon: number;
   lat: number;
-  label?: string;
+  label?: string; // 지도에 항상 보이는 이름
+  name?: string; // 마우스를 올렸을 때 툴팁 이름
   tone: 'city' | 'selected' | 'correct' | 'wrong';
+  color?: string; // tone 색 대신 쓸 색
 }
 
 export interface MapClick {
@@ -24,30 +31,44 @@ export interface MapClick {
   markerId: string | null; // 도시 점을 클릭했을 때
 }
 
+/**
+ * 확대 요청. 새 객체를 넘길 때마다 지도가 해당 영역에 맞춰 이동한다.
+ * countryIds 와 points 가 모두 비어 있으면 전체 지도로 돌아간다.
+ */
+export interface MapFocus {
+  countryIds: string[];
+  points: [number, number][]; // [경도, 위도]
+}
+
 interface Props {
   countries: Country[];
-  highlights: HighlightMap;
-  markers: MapMarker[];
-  /** 이 국가로 확대 이동 (null 이면 전체 보기) */
-  focusCountryId?: string | null;
+  highlights?: HighlightMap;
+  /** 국가별 채우기 색 (여러 나라를 서로 다른 색으로 칠할 때) */
+  fillColors?: Record<string, string>;
+  markers?: MapMarker[];
+  focus?: MapFocus | null;
   onMapClick?: (click: MapClick) => void;
-  /** 마우스를 올렸을 때 국가 이름 툴팁을 보여줄지 (게임 모드에서는 끔) */
+  /** 마우스를 올렸을 때 이름 툴팁을 보여줄지 (게임 모드에서는 끔) */
   showTooltip?: boolean;
+  /** 도시 점 크기 배율 (도시 지도에서는 크게) */
+  markerScale?: number;
 }
 
 export default function WorldMap({
   countries,
-  highlights,
-  markers,
-  focusCountryId = null,
+  highlights = NO_HIGHLIGHTS,
+  fillColors = NO_FILLS,
+  markers = NO_MARKERS,
+  focus = null,
   onMapClick,
   showTooltip = true,
+  markerScale = 1,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown>>();
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
-  const [hovered, setHovered] = useState<Country | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   // 투영법: Natural Earth (교육용 세계지도에 흔히 쓰이는 왜곡 적은 도법)
   const { projection, path } = useMemo(() => {
@@ -74,23 +95,43 @@ export default function WorldMap({
     };
   }, []);
 
-  // 선택된 국가로 부드럽게 확대
+  // 확대 요청이 오면 선택한 곳이 모두 보이도록 이동
   useEffect(() => {
     const svg = svgRef.current;
     const z = zoomRef.current;
-    if (!svg || !z) return;
-    const target = focusCountryId ? byId.get(focusCountryId) : null;
+    if (!svg || !z || !focus) return;
+
+    let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+    const include = (ax: number, ay: number, bx: number, by: number) => {
+      x0 = Math.min(x0, ax);
+      y0 = Math.min(y0, ay);
+      x1 = Math.max(x1, bx);
+      y1 = Math.max(y1, by);
+    };
+    for (const id of focus.countryIds) {
+      const c = byId.get(id);
+      if (!c) continue;
+      const [[ax, ay], [bx, by]] = path.bounds(mainland(c));
+      include(ax, ay, bx, by);
+    }
+    for (const p of focus.points) {
+      const q = projection(p);
+      if (q) include(q[0], q[1], q[0], q[1]);
+    }
+
     let next = zoomIdentity;
-    if (target) {
-      const [[x0, y0], [x1, y1]] = path.bounds(mainland(target));
-      const k = Math.min(8, 0.8 / Math.max((x1 - x0) / WIDTH, (y1 - y0) / HEIGHT));
+    if (Number.isFinite(x0)) {
+      // 도시 하나만 선택하면 영역 크기가 0 이므로 최소 크기를 둔다
+      const w = Math.max(x1 - x0, 40);
+      const h = Math.max(y1 - y0, 25);
+      const k = Math.max(1, Math.min(MAX_FOCUS_ZOOM, 0.8 / Math.max(w / WIDTH, h / HEIGHT)));
       next = zoomIdentity
         .translate(WIDTH / 2, HEIGHT / 2)
         .scale(k)
         .translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
     }
     select(svg).transition().duration(750).call(z.transform, next);
-  }, [focusCountryId, byId, path]);
+  }, [focus, byId, path, projection]);
 
   const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!onMapClick || !gRef.current) return;
@@ -102,6 +143,11 @@ export default function WorldMap({
     const markerId = el.closest('[data-marker-id]')?.getAttribute('data-marker-id') ?? null;
     onMapClick({ country: id ? byId.get(id) ?? null : null, lonLat: inv, markerId });
   };
+
+  const onCountryHover = useMemo(
+    () => (showTooltip ? (c: Country | null) => setHovered(c?.nameKo ?? null) : undefined),
+    [showTooltip],
+  );
 
   return (
     <div className="map-wrap">
@@ -120,17 +166,27 @@ export default function WorldMap({
             countries={countries}
             path={path}
             highlights={highlights}
-            onHover={showTooltip ? setHovered : undefined}
+            fillColors={fillColors}
+            onHover={onCountryHover}
           />
           {markers.map((m) => {
             const p = projection([m.lon, m.lat]);
             if (!p) return null;
-            const r = 5 / transform.k; // 확대해도 화면상 점 크기는 일정하게
+            const r = (5 * markerScale) / transform.k; // 확대해도 화면상 점 크기는 일정하게
             return (
-              <g key={m.id} data-marker-id={m.id} className={`marker marker-${m.tone}`} transform={`translate(${p[0]},${p[1]})`}>
-                <circle r={r} />
+              <g
+                key={m.id}
+                data-marker-id={m.id}
+                className={`marker marker-${m.tone}`}
+                transform={`translate(${p[0]},${p[1]})`}
+                onMouseEnter={() => showTooltip && setHovered(m.name ?? m.label ?? null)}
+                onMouseLeave={() => showTooltip && setHovered(null)}
+              >
+                {/* 작은 점도 쉽게 클릭되도록 보이지 않는 넓은 영역 */}
+                <circle className="hit" r={r * 2.2} />
+                <circle r={r} style={m.color ? { fill: m.color } : undefined} />
                 {m.label && (
-                  <text y={-r - 3} fontSize={12 / transform.k}>
+                  <text y={-r - 3 / transform.k} fontSize={12 / transform.k}>
                     {m.label}
                   </text>
                 )}
@@ -139,7 +195,7 @@ export default function WorldMap({
           })}
         </g>
       </svg>
-      {showTooltip && hovered && <div className="map-tooltip">{hovered.nameKo}</div>}
+      {showTooltip && hovered && <div className="map-tooltip">{hovered}</div>}
       <div className="map-hint">드래그: 이동 · 휠/핀치: 확대</div>
     </div>
   );
@@ -163,11 +219,13 @@ const CountryLayer = memo(function CountryLayer({
   countries,
   path,
   highlights,
+  fillColors,
   onHover,
 }: {
   countries: Country[];
   path: GeoPath;
   highlights: HighlightMap;
+  fillColors: Record<string, string>;
   onHover?: (c: Country | null) => void;
 }) {
   const ds = useMemo(() => countries.map((c) => path(c.feature) ?? ''), [countries, path]);
@@ -178,7 +236,8 @@ const CountryLayer = memo(function CountryLayer({
           key={c.id}
           data-id={c.id}
           d={ds[i]}
-          className={`country ${highlights[c.id] ?? ''}`}
+          className={`country ${highlights[c.id] ?? ''} ${fillColors[c.id] ? 'filled' : ''}`}
+          style={fillColors[c.id] ? { fill: fillColors[c.id] } : undefined}
           onMouseEnter={() => onHover?.(c)}
         />
       ))}

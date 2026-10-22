@@ -6,11 +6,12 @@ import ScoreBoard from './ScoreBoard';
 interface Props {
   game: GameState;
   countryById: Map<string, Country>;
+  onOpenRanking?: () => void;
 }
 
 const KIND_LABEL: Record<QuestionKind, string> = { country: '국가', city: '도시', mixed: '섞어서' };
 
-export default function GamePanel({ game, countryById }: Props) {
+export default function GamePanel({ game, countryById, onOpenRanking }: Props) {
   const [kind, setKind] = useState<QuestionKind>('country');
   const [count, setCount] = useState(10);
   const { phase, current, answer } = game;
@@ -65,6 +66,7 @@ export default function GamePanel({ game, countryById }: Props) {
             total: game.total,
             quiz_kind: game.kind,
           }}
+          onOpenRanking={onOpenRanking}
         />
         <button className="primary" onClick={game.reset}>
           다시 하기

@@ -1,6 +1,9 @@
 import type { Feature, MultiPolygon, Polygon } from 'geojson';
 
-export type Mode = 'learn' | 'game';
+export type Mode = 'learn' | 'game' | 'ranking';
+
+/** 학습 모드에서 보는 지도 종류 */
+export type LearnView = 'country' | 'city';
 
 /** 지도에 그려지는 국가 하나 */
 export interface Country {

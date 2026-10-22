@@ -136,3 +136,40 @@ button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .ranking .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranking .pts { font-weight: 700; color: var(--primary); }
 .hint { margin: 0; color: #92400e; background: #fef3c7; border-radius: 6px; padding: 6px 10px; }
+
+/* ── 학습 모드: 여러 개 선택 ── */
+.country.filled:hover { filter: brightness(1.1); }
+.marker .hit { fill: transparent; stroke: none; }
+.selected-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.selected-head h4 { margin: 0; }
+.selected-actions { display: flex; gap: 10px; }
+button.link.danger { color: var(--wrong); }
+.selected-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
+.selected-list li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; }
+.selected-list li:hover { background: #f8fafc; }
+.swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.sel-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remove { border: 0; background: none; color: var(--muted); font-size: 1.1rem; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+.remove:hover { background: #fee2e2; color: var(--wrong); }
+.list-title { margin: 0 0 6px; }
+.chip.active { color: #fff; }
+
+/* ── 랭킹 ── */
+.layout.single { grid-template-columns: minmax(0, 720px); justify-content: center; }
+.ranking-title { display: flex; justify-content: space-between; align-items: center; }
+.ranking-filters { display: grid; gap: 10px; }
+.my-rank { margin: 4px 0 0; font-weight: 500; }
+.my-rank strong { font-size: 1.2rem; color: var(--primary); }
+.ranking li.top-1 { background: #fef9c3; }
+.ranking li.top-2 { background: #f1f5f9; }
+.ranking li.top-3 { background: #ffedd5; }
+.ranking li.me { outline: 2px solid var(--primary); }
+.ranking .rank { width: 2em; text-align: center; }
+.ranking.detailed .correct { width: 3.5em; text-align: right; color: var(--muted); }
+.ranking.detailed .date { width: 3em; text-align: right; color: var(--muted); font-size: 0.85rem; }
+.ranking.detailed .pts { width: 4em; text-align: right; }
+.ranking .ranking-head { background: none; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.ranking .ranking-head .pts { color: var(--muted); }
+.selected-head { flex-wrap: wrap; row-gap: 2px; }
+.selected-head h4, .selected-actions { white-space: nowrap; }
+.city-chips { max-height: 220px; overflow-y: auto; padding: 2px; }
