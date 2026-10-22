@@ -105,9 +105,12 @@ export default function GamePanel({ game, countryById, onOpenRanking }: Props) {
           {current.kind === 'country' && !answer.correct && (
             <p>{clickedName ? `클릭한 곳은 ${clickedName}이에요.` : '바다를 클릭했어요.'} 초록색이 정답이에요.</p>
           )}
-          {current.kind === 'city' && answer.distanceKm != null && (
-            <p>정답과의 거리: 약 {answer.distanceKm.toLocaleString()}km</p>
-          )}
+          {current.kind === 'city' &&
+            (answer.distanceKm != null ? (
+              <p>정답과의 거리: 약 {answer.distanceKm.toLocaleString()}km</p>
+            ) : (
+              <p>지구 바깥을 클릭했어요. 초록 점이 정답이에요.</p>
+            ))}
           <button className="primary" onClick={game.next}>
             {game.index + 1 >= game.total ? '결과 보기' : '다음 문제'}
           </button>

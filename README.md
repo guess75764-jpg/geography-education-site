@@ -34,7 +34,7 @@ npm run build    # 배포용 정적 파일 → dist/
 | --- | --- | --- |
 | 언어 | TypeScript | 지도 데이터(GeoJSON) 구조가 복잡해 타입이 실수를 많이 막아줌 |
 | UI | React 18 + Vite | 모드 전환·점수·피드백 같은 상태 관리가 쉽고, 개발 서버가 빠름 |
-| 지도 | D3 (`d3-geo`, `d3-zoom`) + SVG, 메르카토르 도법 (위도 84°N~58°S) | 타일 없는 **백지도**, 국가별 색칠, 클릭 판정에 최적. Leaflet은 타일 지도용이라 이 용도엔 과함 |
+| 지도 | D3 (`d3-geo`, `d3-zoom`) + SVG, 이퀄 어스 도법 (네모난 바다 배경) | 타일 없는 **백지도**, 국가별 색칠, 클릭 판정에 최적. Leaflet은 타일 지도용이라 이 용도엔 과함 |
 | 데이터 | `world-atlas` (Natural Earth 1:50m TopoJSON) | 241개 국가 경계, 오프라인 번들 |
 | 국가명 | `Intl.DisplayNames` + `i18n-iso-countries` | 한국어 국가명 자동 |
 

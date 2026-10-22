@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { geoArea, geoGraticule10, geoMercator, geoPath, type GeoPath } from 'd3-geo';
+import { geoArea, geoGraticule10, geoEqualEarth, geoPath, type GeoPath } from 'd3-geo';
 import { pointer, select } from 'd3-selection';
 import { zoom, zoomIdentity, type ZoomBehavior, type ZoomTransform } from 'd3-zoom';
 import 'd3-transition'; // selection.transition() 을 활성화
@@ -7,24 +7,14 @@ import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import type { Country, HighlightMap } from '../types';
 
 // SVG 내부 좌표계 크기. 실제 화면 크기는 CSS(width:100%)로 맞춘다.
-// 메르카토르 도법은 극으로 갈수록 끝없이 늘어나므로, 학교 지도처럼 위도 범위를 잘라서 보여준다.
-export const MAP_NORTH = 84; // 그린란드 북쪽 끝까지
-export const MAP_SOUTH = -58; // 남아메리카 남쪽 끝 아래 (남극 대륙은 표시하지 않음)
+// 이퀄 어스(Equal Earth) 도법: 나라 면적 비율이 실제와 같아 왜곡이 적다.
+// 지구 모양 자체는 양옆이 둥글기 때문에, 바깥 모서리를 바다색으로 채워 네모난 지도로 보여준다.
 const WIDTH = 960;
 
-/** 가로 폭이 WIDTH 인 메르카토르 투영을 만들고, 잘라낸 지도의 높이를 함께 돌려준다. */
 function makeProjection() {
-  const projection = geoMercator()
-    .scale(WIDTH / (2 * Math.PI)) // 경도 360° = 가로 폭
-    .translate([WIDTH / 2, 0]);
-  const top = projection([0, MAP_NORTH])![1];
-  projection.translate([WIDTH / 2, -top]); // 북쪽 끝이 y=0 이 되도록
-  const height = Math.round(projection([0, MAP_SOUTH])![1]);
-  projection.clipExtent([
-    [0, 0],
-    [WIDTH, height],
-  ]);
-  return { projection, height };
+  const projection = geoEqualEarth().fitWidth(WIDTH, { type: 'Sphere' });
+  const [[, y0], [, y1]] = geoPath(projection).bounds({ type: 'Sphere' });
+  return { projection, height: Math.ceil(y1 - y0) };
 }
 
 const { height: HEIGHT } = makeProjection();
@@ -89,7 +79,7 @@ export default function WorldMap({
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  // 투영법: 메르카토르 (교실 벽걸이 지도에 흔한 도법. 고위도일수록 실제보다 크게 보인다)
+  // 투영법: 이퀄 어스 (면적 비율이 정확한 도법)
   const { projection, path } = useMemo(() => {
     const { projection } = makeProjection();
     return { projection, path: geoPath(projection) };
@@ -156,7 +146,12 @@ export default function WorldMap({
     if (!onMapClick || !gRef.current) return;
     // 클릭 좌표 → (줌 변환 역적용) → 투영 역변환 → 경도/위도
     const [x, y] = pointer(e.nativeEvent, gRef.current);
-    const inv = projection.invert?.([x, y]) ?? null;
+    const raw = projection.invert?.([x, y]) ?? null;
+    // 지구 바깥(네모 모서리 부분)을 클릭하면 위치 없음으로 처리:
+    // 거꾸로 계산한 경위도를 다시 지도 좌표로 바꿨을 때 클릭 위치와 다르면 지구 바깥이다.
+    const back = raw ? projection(raw) : null;
+    const onGlobe = !!back && Math.hypot(back[0] - x, back[1] - y) < 1;
+    const inv = onGlobe ? raw : null;
     const el = e.target as Element;
     const id = el.getAttribute('data-id');
     const markerId = el.closest('[data-marker-id]')?.getAttribute('data-marker-id') ?? null;
@@ -179,7 +174,8 @@ export default function WorldMap({
         aria-label="세계지도"
       >
         <g ref={gRef} transform={transform.toString()}>
-          <path className="sphere" d={path({ type: 'Sphere' }) ?? ''} />
+          {/* 네모난 바다 배경 (지구 바깥 모서리까지 바다색) */}
+          <rect className="ocean" x={0} y={0} width={WIDTH} height={HEIGHT} />
           <path className="graticule" d={path(geoGraticule10()) ?? ''} />
           <CountryLayer
             countries={countries}

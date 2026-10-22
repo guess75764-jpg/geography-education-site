@@ -51,7 +51,7 @@ button { font: inherit; cursor: pointer; }
 .map-wrap { position: relative; background: var(--panel); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
 .world-map { display: block; width: 100%; height: auto; cursor: grab; touch-action: none; }
 .world-map:active { cursor: grabbing; }
-.sphere { fill: var(--ocean); }
+.ocean { fill: var(--ocean); }
 .graticule { fill: none; stroke: #bfdbfe; stroke-width: 0.5; vector-effect: non-scaling-stroke; }
 .country {
   fill: var(--land); stroke: var(--land-border); stroke-width: 0.5;
