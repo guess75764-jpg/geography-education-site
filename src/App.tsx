@@ -3,6 +3,7 @@ import WorldMap, { type MapClick, type MapFocus, type MapMarker } from './compon
 import LearnPanel from './components/LearnPanel';
 import GamePanel from './components/GamePanel';
 import RankingPage from './components/RankingPage';
+import Celebration, { usePreloadCharacters } from './components/Celebration';
 import { useWorldData } from './hooks/useWorldData';
 import { useGame } from './game/useGame';
 import { CITIES } from './data/cities';
@@ -54,6 +55,7 @@ export default function App() {
 
   // ── 게임 모드 ──
   const game = useGame(countries, CITIES);
+  usePreloadCharacters();
 
   // ── 랭킹 ──
   const [rankingFilter, setRankingFilter] = useState<RankingFilter>({ kind: 'country', total: 10, period: 'all' });
@@ -168,6 +170,8 @@ export default function App() {
                 showTooltip={false}
               />
             )}
+            {/* 정답이면 지역 캐릭터가 축하 (문제마다 새로 등장) */}
+            {mode === 'game' && game.answer?.correct && <Celebration key={game.index} />}
           </section>
 
           {mode === 'learn' ? (
