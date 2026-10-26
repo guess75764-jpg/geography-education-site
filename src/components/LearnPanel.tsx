@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react';
 import { colorAt } from '../data/palette';
+import { GEO_HINTS, type CountryHint } from '../data/hints';
+
+const HINT_BY_COUNTRY = new Map(
+  GEO_HINTS.filter((h): h is CountryHint => h.kind === 'country').map((h) => [h.countryId, h]),
+);
 import type { City, Country, LearnView } from '../types';
 
 interface Props {
@@ -147,6 +152,28 @@ export default function LearnPanel({
           </ul>
         )}
       </div>
+
+      {/* 수능 포인트: 선택한 나라 중 힌트 데이터가 있는 나라의 기후·자원 */}
+      {isCountry &&
+        selectedCountryIds
+          .map((id) => HINT_BY_COUNTRY.get(id))
+          .filter((h): h is CountryHint => !!h)
+          .map((h) => (
+            <div key={h.id} className="exam-point">
+              <h4>📝 수능 포인트 · {h.answer}</h4>
+              <p className="small">
+                <b>기후</b> {h.climate}
+              </p>
+              <div className="chips">
+                {h.resources.map((r) => (
+                  <span key={r} className="chip static">
+                    {r}
+                  </span>
+                ))}
+              </div>
+              <p className="small">💡 {h.explanation}</p>
+            </div>
+          ))}
 
       {!isCountry && (
         <div>

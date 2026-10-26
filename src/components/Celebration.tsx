@@ -6,7 +6,6 @@ const CHARACTER_URLS: string[] = Object.values(
 ) as string[];
 
 const CHEERS = ['정답이에요!', '대단해요!', '최고예요!', '완벽해요!', '지리 박사!', '멋져요!', '척척박사!'];
-const CONFETTI_COLORS = ['#3b82f6', '#f97316', '#10b981', '#a855f7', '#ef4444', '#eab308', '#ec4899'];
 
 /** 같은 캐릭터가 연달아 나오지 않도록, 20장을 섞어 한 바퀴씩 돌린다 */
 let bag: string[] = [];
@@ -32,23 +31,17 @@ export function usePreloadCharacters() {
 }
 
 /**
- * 정답 축하 연출: 지도 오른쪽 아래에서 캐릭터가 튀어 오르고 색종이가 터진다.
+ * 정답 축하: 지도 오른쪽 아래에서 지역 캐릭터가 튀어 오르며 응원한다. (폭죽은 fx.ts 가 담당)
  * 지도 클릭을 막지 않도록 pointer-events 는 꺼 둔다.
  */
-export default function Celebration() {
-  const { src, cheer, confetti } = useMemo(
+export default function Celebration({ combo }: { combo: number }) {
+  const { src, cheer } = useMemo(
     () => ({
       src: nextCharacter(),
-      cheer: CHEERS[Math.floor(Math.random() * CHEERS.length)],
-      confetti: Array.from({ length: 18 }, (_, i) => ({
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-        // 위쪽 반원으로 퍼지는 방향과 거리
-        angle: -160 + (140 / 17) * i + (Math.random() * 10 - 5),
-        dist: 90 + Math.random() * 70,
-        delay: Math.random() * 0.12,
-        rot: Math.random() * 720 - 360,
-      })),
+      cheer: combo >= 3 ? `${combo}연속 정답!` : CHEERS[Math.floor(Math.random() * CHEERS.length)],
     }),
+    // 등장할 때 한 번만 정한다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -56,25 +49,6 @@ export default function Celebration() {
 
   return (
     <div className="celebration" aria-live="polite">
-      <div className="confetti">
-        {confetti.map((c, i) => {
-          const rad = (c.angle * Math.PI) / 180;
-          return (
-            <span
-              key={i}
-              style={
-                {
-                  background: c.color,
-                  '--dx': `${Math.cos(rad) * c.dist}px`,
-                  '--dy': `${Math.sin(rad) * c.dist}px`,
-                  '--rot': `${c.rot}deg`,
-                  animationDelay: `${c.delay}s`,
-                } as React.CSSProperties
-              }
-            />
-          );
-        })}
-      </div>
       <div className="cheer-bubble">{cheer} 🎉</div>
       <img className="cheer-character" src={src} alt="정답을 축하하는 지역 캐릭터" draggable={false} />
     </div>

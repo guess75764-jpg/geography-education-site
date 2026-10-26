@@ -1,5 +1,25 @@
 # 🌏 세계지도 퀴즈
 
+고등학생 통합사회·수능 지리 학습용 세계지도 게임.
+
+## 주요 기능
+
+| 화면 | 내용 |
+| --- | --- |
+| 🏠 홈 | 모드 바로 시작 카드, **명예의 전당 Top 10**(시상대), 칭호 안내 |
+| 📖 학습 | 국가 지도 / 도시 지도, 여러 개 선택, 선택한 나라의 **수능 포인트**(기후·자원) |
+| 🎯 게임 | 문제 유형: 국가 · 도시 · 섞어서 · **수능 힌트** / 방식: **타임어택 60초** · 연습 10문제 |
+| 🏆 명예의 전당 | 문제 유형·기간별 Top 50, 칭호 표시 |
+
+### 점수 규칙 (`src/game/scoring.ts` 에서 숫자만 바꾸면 밸런스 조정)
+- 정답 100점 + **속도 보너스** 최대 100점 (8초 안에 맞힐수록 큼)
+- **콤보 배수**: 연속 정답 3개 ×1.5 → 6개 ×2 → 9개 ×2.5 → 12개 ×3, 틀리면 초기화
+- **칭호**: 🥉 지리 브론즈(0) · 🥈 지리 실버(1,000) · 🥇 지리 골드(2,500) · 💎 수능 1등급(4,500) · 🌏 세계시민(7,000)
+
+### 수능 힌트 문제 추가하기
+`src/data/hints.ts` 의 `GEO_HINTS` 배열에 객체를 추가하면 됩니다.
+국가는 `countryId`(ISO 숫자 코드, 예: 아르헨티나 `'032'`), 도시는 `lon`/`lat` 좌표로 정답을 판정합니다.
+
 학생용 세계지도 국가/도시 맞추기 교육용 게임.
 
 ## 실행
@@ -16,7 +36,7 @@ npm run build:html  # HTML 파일 하나로 묶기 → dist-single/index.html
 
 ## 점수 저장 (Supabase) 설정
 
-1. **표 만들기** — Supabase 대시보드 → SQL Editor 에 `supabase/migrations/001_create_scores.sql` 내용을 붙여넣고 Run.
+1. **표 만들기** — Supabase 대시보드 → SQL Editor 에 `supabase/migrations/001_create_scores.sql` 내용을 붙여넣고 Run. (여러 번 실행해도 안전, 예전 버전 테이블은 자동 업그레이드)
 2. **키 설정** — `cp .env.example .env` 후 값 채우기
    - `VITE_SUPABASE_URL`: 프로젝트 URL
    - `VITE_SUPABASE_PUBLISHABLE_KEY`: Project Settings → API Keys 의 **Publishable key** (`sb_publishable_…`)
@@ -53,7 +73,14 @@ src/
     WorldMap.tsx          D3 투영 + SVG 렌더링, 확대/이동, 클릭 → 국가/경위도 변환
     LearnPanel.tsx        학습 모드: 검색, 선택 국가 정보, 도시 목록
     GamePanel.tsx         게임 모드: 설정, 문제, 정답/오답, 점수
-  game/useGame.ts         출제·채점 로직 (국가: 클릭한 영역 비교, 도시: 거리 500km 이내)
+  game/useGame.ts         출제·채점·타이머·콤보 로직 (국가: 클릭한 영역 비교, 도시: 거리 500km 이내)
+  game/scoring.ts         점수·콤보 배수·칭호 규칙
+  game/fx.ts              정답 폭죽 효과 (canvas-confetti)
+  data/hints.ts           수능 힌트 문제 데이터 (기후·자원·해설)
+  components/HomePage.tsx 메인 화면
+  components/HallOfFame.tsx 명예의 전당 (시상대 + 목록)
+  components/GameHud.tsx  지도 위 타이머·콤보·카운트다운·점수 팝업
+  components/ReviewList.tsx 게임 후 문제 돌아보기(해설)
   hooks/useWorldData.ts   TopoJSON → GeoJSON + 한국어 이름
   data/cities.ts          도시 목록 (좌표) — 여기에 추가하면 바로 반영
   components/ScoreBoard.tsx  게임 종료 후 닉네임으로 점수 저장 + 순위표
