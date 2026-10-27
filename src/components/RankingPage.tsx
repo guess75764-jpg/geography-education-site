@@ -7,7 +7,7 @@ export default function RankingPage({ initial }: { initial: RankingFilter }) {
     <div className="ranking-page">
       <HallOfFame limit={50} initial={initial} showPeriod />
       <p className="muted small center">
-        타임어택(20문제) 기록만 순위에 올라가요. 같은 점수면 더 빨리 끝낸 기록이 위에 오고, 등수는 같아요.
+        도전 단계별로 순위를 매겨요. 같은 점수면 더 빨리 끝낸 기록이 위에 오고, 등수는 같아요. 칭호는 그 도전에 성공(시간 안에 모두 풀고 정답률 80% 이상)했을 때 표시돼요.
       </p>
     </div>
   );

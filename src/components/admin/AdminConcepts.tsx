@@ -9,7 +9,7 @@ import {
   type ConceptRow,
 } from '../../lib/concepts';
 import { describeDbError } from '../../lib/scores';
-import { TIMEATTACK_COUNT } from '../../game/scoring';
+import { CHALLENGES } from '../../game/scoring';
 import { CITIES } from '../../data/cities';
 import type { Country } from '../../types';
 
@@ -290,11 +290,19 @@ export default function AdminConcepts({
           <b>{rows ? activeCount : '-'}</b>
           <span>게임에 출제 중</span>
         </div>
-        <p className={`small ${rows && activeCount < TIMEATTACK_COUNT ? 'hint' : 'muted'}`}>
-          {rows && activeCount < TIMEATTACK_COUNT
-            ? `출제 중인 개념이 ${TIMEATTACK_COUNT}개보다 적어 한 판에 같은 개념이 반복돼요. ${TIMEATTACK_COUNT - activeCount}개 이상 더 추가하면 중복 없이 출제돼요.`
-            : `한 판(${TIMEATTACK_COUNT}문제)마다 출제 중인 개념 중에서 무작위로, 중복 없이 뽑아요.`}
-        </p>
+        <div className="coverage">
+          <p className="muted small">타임어택은 출제 중인 개념에서 무작위로 뽑아요. 문제 수보다 개념이 적으면 한 판 안에서 반복돼요.</p>
+          <div className="coverage-chips">
+            {CHALLENGES.map((c) => {
+              const ok = rows !== null && activeCount >= c.count;
+              return (
+                <span key={c.count} className={`coverage-chip ${ok ? 'ok' : 'no'}`} title={c.title}>
+                  {c.tier.emoji} {c.count}문제 {rows === null ? '' : ok ? '✓ 중복 없음' : `· ${c.count - activeCount}개 더 필요`}
+                </span>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {msg && <p className={`admin-msg ${msg.error ? 'error' : ''}`}>{msg.text}</p>}

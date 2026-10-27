@@ -10,7 +10,10 @@ import AdminPage from './components/admin/AdminPage';
 import Celebration, { usePreloadCharacters } from './components/Celebration';
 import { useWorldData } from './hooks/useWorldData';
 import { useConcepts } from './hooks/useConcepts';
-import { useGame, type QuizType } from './game/useGame';
+import { useGame } from './game/useGame';
+import { useStudy } from './game/useStudy';
+import StudyPanel from './components/StudyPanel';
+import type { ChallengeCount } from './game/scoring';
 import { comboMultiplier } from './game/scoring';
 import { fireComboLevelUp, fireCorrect } from './game/fx';
 import { CITIES } from './data/cities';
@@ -81,10 +84,12 @@ export default function App() {
 
   // ── 게임 모드 ──
   const game = useGame(countries, CITIES, concepts.hints);
+  // ── 개념 공부 ──
+  const study = useStudy(concepts.hints);
   usePreloadCharacters();
 
   // ── 명예의 전당 ──
-  const [rankingFilter, setRankingFilter] = useState<RankingFilter>({ kind: 'all', period: 'all' });
+  const [rankingFilter, setRankingFilter] = useState<RankingFilter>({ challenge: 10, period: 'all' });
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -92,12 +97,16 @@ export default function App() {
     // 관리자 화면을 벗어나면 주소의 #admin 을 지운다
     if (m !== 'admin' && window.location.hash === '#admin') history.replaceState(null, '', window.location.pathname + window.location.search);
   };
-  const startFromHome = (t: QuizType) => {
+  const startFromHome = (challenge: ChallengeCount) => {
     setMode('game');
-    game.start(t, 'timeattack');
+    game.start({ style: 'timeattack', challenge });
+  };
+  const openStudy = () => {
+    setLearnView('study');
+    switchMode('learn');
   };
   const openRankingFromGame = () => {
-    setRankingFilter({ kind: game.type, period: 'all' });
+    setRankingFilter({ challenge: game.challenge, period: 'all' });
     switchMode('ranking');
   };
 
@@ -138,6 +147,7 @@ export default function App() {
   // ── 지도 클릭 처리 ──
   const handleMapClick = ({ country, lonLat, markerId }: MapClick) => {
     if (mode === 'learn') {
+      if (learnView === 'study') study.answer(country && !country.id.startsWith('x-') ? country.id : null, lonLat);
       if (learnView === 'country' && country && !country.id.startsWith('x-')) toggleCountry(country.id, false);
       if (learnView === 'city' && markerId) toggleCity(markerId, false);
     } else if (mode === 'game') {
@@ -169,6 +179,41 @@ export default function App() {
     }
     return [...unselected, ...selected]; // 선택한 점이 위에 그려지도록
   }, [selCities, countryById]);
+
+  // ── 개념 공부 지도: 틀리면 고른 곳 빨강, 맞히거나 정답 보기면 정답 초록 + 그쪽으로 확대 ──
+  const studyView = useMemo(() => {
+    const highlights: HighlightMap = {};
+    const markers: MapMarker[] = [];
+    const h = study.current;
+    const c = study.lastClick;
+    const done = study.status === 'correct' || study.status === 'revealed';
+    if (h) {
+      const isPoint = h.kind === 'city' && h.lon !== undefined && h.lat !== undefined;
+      if (study.status === 'wrong' && c) {
+        if (isPoint && c.lonLat) markers.push({ id: 'clicked', lon: c.lonLat[0], lat: c.lonLat[1], tone: 'wrong' });
+        else if (c.countryId) highlights[c.countryId] = 'wrong';
+      }
+      if (done) {
+        if (isPoint) markers.push({ id: 'answer', lon: h.lon!, lat: h.lat!, tone: 'correct', label: h.answer });
+        else highlights[h.countryId] = 'correct';
+      }
+    }
+    return { highlights, markers };
+  }, [study.current, study.lastClick, study.status]);
+  const [studyFocus, setStudyFocus] = useState<MapFocus | null>(null);
+  useEffect(() => {
+    const h = study.current;
+    if (!h) return;
+    if (study.status === 'correct' || study.status === 'revealed') {
+      setStudyFocus(
+        h.kind === 'city' && h.lon !== undefined && h.lat !== undefined
+          ? { countryIds: [], points: [[h.lon, h.lat]] }
+          : { countryIds: [h.countryId], points: [] },
+      );
+    } else if (study.status === 'asking') {
+      setStudyFocus(WORLD);
+    }
+  }, [study.current, study.status]);
 
   // ── 게임 모드 지도 색/점: 답한 직후 정답(초록)과 내가 고른 곳(빨강) ──
   const gameView = useMemo(() => {
@@ -207,7 +252,7 @@ export default function App() {
 
       {mode === 'home' ? (
         <main className="page">
-          <HomePage onStart={startFromHome} onLearn={() => switchMode('learn')} />
+          <HomePage onStart={startFromHome} onStudy={openStudy} onPlay={() => switchMode('game')} />
         </main>
       ) : mode === 'admin' ? (
         <main className="page">
@@ -223,6 +268,17 @@ export default function App() {
             <section className="map-area" ref={mapAreaRef} onClickCapture={rememberClick}>
               {mode === 'learn' && learnView === 'country' && (
                 <WorldMap key="learn-country" countries={countries} fillColors={countryFills} focus={countryFocus} onMapClick={handleMapClick} />
+              )}
+              {mode === 'learn' && learnView === 'study' && (
+                <WorldMap
+                  key="learn-study"
+                  countries={countries}
+                  highlights={studyView.highlights}
+                  markers={studyView.markers}
+                  focus={studyFocus}
+                  onMapClick={handleMapClick}
+                  showTooltip={false}
+                />
               )}
               {mode === 'learn' && learnView === 'city' && (
                 <WorldMap
@@ -255,6 +311,7 @@ export default function App() {
           {mode === 'learn' ? (
             <LearnPanel
               hints={concepts.hints}
+              study={<StudyPanel study={study} countryById={countryById} source={concepts.source} />}
               view={learnView}
               onViewChange={setLearnView}
               countries={countries}

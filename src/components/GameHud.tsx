@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { comboMultiplier, combosToNextMultiplier } from '../game/scoring';
+import { challengeOf, comboMultiplier, combosToNextMultiplier } from '../game/scoring';
 import type { GameState } from '../game/useGame';
 
 export interface FloatingPoint {
@@ -10,9 +10,9 @@ export interface FloatingPoint {
   good: boolean;
 }
 
-/** 경과 시간을 0:42.3 형식으로 */
+/** 시간을 0:42.3 (또는 0:42) 형식으로. 남은 시간은 올림해서 보여 준다 */
 export function formatDuration(ms: number, withTenths = true): string {
-  const total = Math.max(0, ms) / 1000;
+  const total = withTenths ? Math.max(0, ms) / 1000 : Math.ceil(Math.max(0, ms) / 1000);
   const m = Math.floor(total / 60);
   const s = total - m * 60;
   return `${m}:${(withTenths ? s.toFixed(1) : Math.floor(s).toString()).padStart(withTenths ? 4 : 2, '0')}`;
@@ -26,7 +26,6 @@ export default function GameHud({ game, floats }: { game: GameState; floats: Flo
   const { phase, combo, lastResult } = game;
   const isTimed = game.style === 'timeattack';
   const playing = phase === 'playing' || phase === 'answered';
-  const answered = game.results.length;
   const mult = comboMultiplier(combo);
   const toNext = combosToNextMultiplier(combo);
 
@@ -46,15 +45,15 @@ export default function GameHud({ game, floats }: { game: GameState; floats: Flo
   return (
     <div className="hud" aria-live="polite">
       {isTimed && (playing || phase === 'countdown') && (
-        <div className="timer">
+        <div className={`timer ${game.timeLeftMs <= 10000 && playing ? 'warn' : ''}`}>
           <span className="timer-count">
             {Math.min(game.questionNumber, game.totalQuestions)}
             <small>/{game.totalQuestions}</small>
           </span>
-          <div className="timer-bar">
-            <span style={{ width: `${(answered / Math.max(1, game.totalQuestions)) * 100}%` }} />
+          <div className="timer-bar" title="남은 시간">
+            <span style={{ width: `${(game.timeLeftMs / ((challengeOf(game.challenge)?.limitSec ?? 60) * 1000)) * 100}%` }} />
           </div>
-          <span className="timer-sec">⏱ {formatDuration(game.elapsedMs)}</span>
+          <span className="timer-sec">⏱ {formatDuration(game.timeLeftMs, false)}</span>
         </div>
       )}
 

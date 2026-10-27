@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { geoArea, geoDistance } from 'd3-geo';
 import type { City, Country } from '../types';
 import type { GeoHint } from '../data/hints';
-import { CITY_TOLERANCE_KM, FEEDBACK_MS, PRACTICE_COUNT, TIMEATTACK_COUNT, pointsFor } from './scoring';
+import { CITY_TOLERANCE_KM, FEEDBACK_MS, PRACTICE_COUNT, challengeOf, pointsFor, type ChallengeCount } from './scoring';
 
 /** 문제 유형 */
 export type QuizType = 'country' | 'city' | 'mixed' | 'hint';
-/** 플레이 방식: 타임어택(20문제, 랭킹 등록) / 연습(10문제, 해설 보며 천천히) */
+/** 플레이 방식: 타임어택 도전(관리자 개념, 10·20·40·60문제 + 제한 시간, 랭킹 등록) / 연습(10문제, 기록 없음) */
 export type PlayStyle = 'timeattack' | 'practice';
 
 export const QUIZ_TYPE_LABEL: Record<QuizType, string> = {
@@ -70,6 +70,7 @@ function buildQueue(pool: Question[], n: number): Question[] {
 export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) {
   const [type, setType] = useState<QuizType>('country');
   const [style, setStyle] = useState<PlayStyle>('timeattack');
+  const [challenge, setChallenge] = useState<ChallengeCount>(10);
   const [phase, setPhase] = useState<Phase>('ready');
   const [countdown, setCountdown] = useState(COUNTDOWN_FROM);
   const [queue, setQueue] = useState<Question[]>([]);
@@ -127,19 +128,29 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
   );
 
   const isTimed = style === 'timeattack';
-  /** 타임어택 경과 시간 (스톱워치) */
+  const limitMs = (challengeOf(challenge)?.limitSec ?? 60) * 1000;
+  const endsAt = startedAt + limitMs;
+  /** 타임어택 경과 시간 / 남은 시간 */
   const elapsedMs =
-    phase === 'playing' || phase === 'answered' || phase === 'finished' ? Math.max(0, (finishedAt ?? now) - startedAt) : 0;
+    phase === 'playing' || phase === 'answered' || phase === 'finished'
+      ? Math.max(0, Math.min(finishedAt ?? now, isTimed ? endsAt : Infinity) - startedAt)
+      : 0;
+  const timeLeftMs = isTimed ? (phase === 'ready' || phase === 'countdown' ? limitMs : Math.max(0, limitMs - elapsedMs)) : 0;
   const current = phase === 'playing' || phase === 'answered' ? queue[index] ?? null : null;
   const lastResult = phase === 'answered' ? results[results.length - 1] ?? null : null;
   const score = results.reduce((s, r) => s + r.points, 0);
   const maxCombo = results.reduce((m, r) => Math.max(m, r.combo), 0);
 
+  /** 타임어택은 항상 관리자 개념(개념+위치) 문제, 연습은 고른 유형 */
   const start = useCallback(
-    (t: QuizType = type, s: PlayStyle = style) => {
+    (opts: { type?: QuizType; style?: PlayStyle; challenge?: ChallengeCount } = {}) => {
+      const s = opts.style ?? style;
+      const c = opts.challenge ?? challenge;
+      const t = s === 'timeattack' ? 'hint' : opts.type ?? type;
       setType(t);
       setStyle(s);
-      setQueue(buildQueue(poolFor(t), s === 'practice' ? PRACTICE_COUNT : TIMEATTACK_COUNT));
+      setChallenge(c);
+      setQueue(buildQueue(poolFor(t), s === 'practice' ? PRACTICE_COUNT : c));
       setIndex(0);
       setResults([]);
       setCombo(0);
@@ -154,7 +165,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
         setPhase('playing');
       }
     },
-    [type, style, poolFor],
+    [type, style, challenge, poolFor],
   );
 
   // 3-2-1 카운트다운 → 시작
@@ -172,12 +183,19 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
     return () => clearTimeout(id);
   }, [phase, countdown]);
 
-  // 타임어택 스톱워치 화면 갱신
+  // 타임어택 시계: 화면 갱신 + 시간이 다 되면 종료
   useEffect(() => {
     if (!isTimed || (phase !== 'playing' && phase !== 'answered')) return;
-    const id = setInterval(() => setNow(Date.now()), 200);
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= endsAt) {
+        setFinishedAt(endsAt);
+        setPhase('finished');
+      }
+    }, 100);
     return () => clearInterval(id);
-  }, [isTimed, phase]);
+  }, [isTimed, phase, endsAt]);
 
   /** 지도 클릭으로 답하기 */
   const submit = useCallback(
@@ -207,7 +225,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
 
   const next = useCallback(() => {
     if (phase !== 'answered') return;
-    if (index + 1 >= queue.length) {
+    if (index + 1 >= queue.length || (isTimed && Date.now() >= endsAt)) {
       setFinishedAt(Date.now());
       setPhase('finished');
       return;
@@ -215,7 +233,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
     setIndex((i) => i + 1);
     questionStartedAt.current = Date.now();
     setPhase('playing');
-  }, [phase, index, queue.length]);
+  }, [phase, index, queue.length, isTimed, endsAt]);
 
   // 타임어택은 잠깐 결과를 보여 준 뒤 자동으로 다음 문제
   useEffect(() => {
@@ -236,6 +254,8 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
     setType,
     style,
     setStyle,
+    challenge,
+    setChallenge,
     phase,
     countdown,
     current,
@@ -249,6 +269,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
     combo,
     maxCombo,
     elapsedMs,
+    timeLeftMs,
     start,
     submit,
     next,

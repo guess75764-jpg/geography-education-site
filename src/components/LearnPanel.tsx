@@ -6,6 +6,8 @@ import type { City, Country, LearnView } from '../types';
 interface Props {
   /** 관리자가 등록한 개념 (선택한 나라의 개념 포인트 카드에 표시) */
   hints: GeoHint[];
+  /** 개념 공부 화면 (view 가 'study' 일 때 보여 줌) */
+  study: React.ReactNode;
   view: LearnView;
   onViewChange: (v: LearnView) => void;
   countries: Country[];
@@ -21,6 +23,7 @@ interface Props {
 
 export default function LearnPanel({
   hints,
+  study,
   view,
   onViewChange,
   countries,
@@ -69,18 +72,37 @@ export default function LearnPanel({
     [cities, countryById],
   );
 
+  const tabs = (
+    <div className="segmented" role="tablist" aria-label="학습 방법">
+      {(
+        [
+          ['country', '🗺️ 국가'],
+          ['city', '📍 도시'],
+          ['study', '📝 개념 공부'],
+        ] as [LearnView, string][]
+      ).map(([v, label]) => (
+        <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'active' : ''} onClick={() => onViewChange(v)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  // 개념 공부: 관리자 개념을 한 문항씩
+  if (view === 'study') {
+    return (
+      <aside className="panel">
+        <h2>학습 모드</h2>
+        {tabs}
+        {study}
+      </aside>
+    );
+  }
+
   return (
     <aside className="panel">
       <h2>학습 모드</h2>
-
-      <div className="segmented" role="tablist" aria-label="지도 종류">
-        <button role="tab" aria-selected={isCountry} className={isCountry ? 'active' : ''} onClick={() => onViewChange('country')}>
-          🗺️ 국가 지도
-        </button>
-        <button role="tab" aria-selected={!isCountry} className={!isCountry ? 'active' : ''} onClick={() => onViewChange('city')}>
-          📍 도시 지도
-        </button>
-      </div>
+      {tabs}
 
       <p className="muted small">
         {isCountry ? '나라' : '도시'}를 검색하거나 지도에서 클릭하면 색칠돼요. 여러 개를 함께 고를 수 있고, 다시 누르면 해제돼요.

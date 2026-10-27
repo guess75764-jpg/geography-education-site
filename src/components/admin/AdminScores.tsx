@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { deleteScores, describeDbError, fetchScoresAdmin, type ScoreRow } from '../../lib/scores';
-import { QUIZ_TYPE_LABEL, type QuizType } from '../../game/useGame';
 import TierBadge from '../TierBadge';
+import { CHALLENGES, challengeOf, tierOfRecord, type ChallengeCount } from '../../game/scoring';
 import { formatDuration } from '../GameHud';
 
-const KINDS: [QuizType | 'all', string][] = [['all', '전체'], ...(Object.entries(QUIZ_TYPE_LABEL) as [QuizType, string][])];
+const FILTERS: [ChallengeCount | 'all', string][] = [['all', '전체'], ...CHALLENGES.map((c) => [c.count, `${c.tier.emoji} ${c.count}문제`] as [ChallengeCount, string])];
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -13,7 +13,7 @@ function formatDateTime(iso: string) {
 
 /** 명예의 전당 관리: 기록 검색 · 선택 삭제 */
 export default function AdminScores() {
-  const [kind, setKind] = useState<QuizType | 'all'>('all');
+  const [challenge, setChallenge] = useState<ChallengeCount | 'all'>('all');
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<ScoreRow[] | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -24,13 +24,13 @@ export default function AdminScores() {
     setRows(null);
     setSelected(new Set());
     try {
-      setRows(await fetchScoresAdmin({ kind, search }));
+      setRows(await fetchScoresAdmin({ challenge, search }));
     } catch (e) {
       console.error(e);
       setMsg({ text: describeDbError(e), error: true });
       setRows([]);
     }
-  }, [kind, search]);
+  }, [challenge, search]);
 
   useEffect(() => {
     // 검색어 입력이 멈춘 뒤 불러온다
@@ -70,8 +70,8 @@ export default function AdminScores() {
     <section className="card admin-section">
       <div className="admin-toolbar">
         <div className="pill-tabs">
-          {KINDS.map(([k, label]) => (
-            <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}>
+          {FILTERS.map(([k, label]) => (
+            <button key={k} className={challenge === k ? 'active' : ''} onClick={() => setChallenge(k)}>
               {label}
             </button>
           ))}
@@ -103,10 +103,10 @@ export default function AdminScores() {
               <div className="admin-row-main">
                 <strong>{r.nickname}</strong>
                 <span className="sub">
-                  <TierBadge score={r.score} />
-                  <span className="kind-chip">{QUIZ_TYPE_LABEL[r.quiz_kind] ?? r.quiz_kind}</span>
+                  <TierBadge tier={tierOfRecord(r)} />
+                  <span className="kind-chip">{challengeOf(r.challenge)?.title ?? '이전 방식 기록'}</span>
                   <span className="muted small">
-                    정답 {r.correct_count}/{r.total}
+                    정답 {r.correct_count}/{r.challenge ?? r.total}
                     {r.duration_ms != null && ` · ⏱${formatDuration(r.duration_ms)}`} · {formatDateTime(r.created_at)}
                   </span>
                 </span>

@@ -1,6 +1,6 @@
 import { withRanks, type ScoreRow } from '../lib/scores';
-import { QUIZ_TYPE_LABEL } from '../game/useGame';
 import TierBadge from './TierBadge';
+import { challengeOf, tierOfRecord } from '../game/scoring';
 import { formatDuration } from './GameHud';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
@@ -14,13 +14,13 @@ function formatDate(iso: string) {
 export default function RankingList({
   rows,
   highlightId,
-  showKind = false,
+  showChallenge = false,
   rankOffset = 0,
   ranked,
 }: {
   rows: ScoreRow[];
   highlightId?: number | null;
-  showKind?: boolean;
+  showChallenge?: boolean;
   rankOffset?: number;
   /** 이미 등수를 매긴 목록 (명예의 전당에서 시상대와 나눠 쓸 때) */
   ranked?: (ScoreRow & { rank: number })[];
@@ -34,8 +34,8 @@ export default function RankingList({
           <span className="name">
             {r.nickname}
             <span className="sub">
-              <TierBadge score={r.score} />
-              {showKind && <span className="kind-chip">{QUIZ_TYPE_LABEL[r.quiz_kind] ?? r.quiz_kind}</span>}
+              <TierBadge tier={tierOfRecord(r)} />
+              {showChallenge && <span className="kind-chip">{challengeOf(r.challenge)?.title ?? '이전 방식'}</span>}
               {r.max_combo >= 3 && <span className="combo-chip">🔥{r.max_combo}</span>}
               {r.duration_ms != null && <span className="time-chip">⏱{formatDuration(r.duration_ms)}</span>}
               <span className="date">{formatDate(r.created_at)}</span>

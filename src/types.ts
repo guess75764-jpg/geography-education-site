@@ -3,7 +3,7 @@ import type { Feature, MultiPolygon, Polygon } from 'geojson';
 export type Mode = 'home' | 'learn' | 'game' | 'ranking' | 'admin';
 
 /** 학습 모드에서 보는 지도 종류 */
-export type LearnView = 'country' | 'city';
+export type LearnView = 'country' | 'city' | 'study';
 
 /** 지도에 그려지는 국가 하나 */
 export interface Country {

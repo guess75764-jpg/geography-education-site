@@ -8,24 +8,20 @@ import {
   type RankingFilter,
   type ScoreRow,
 } from '../lib/scores';
-import { QUIZ_TYPE_LABEL, type QuizType } from '../game/useGame';
+import { CHALLENGES, challengeOf, formatLimit, tierOfRecord } from '../game/scoring';
 import RankingList from './RankingList';
 import TierBadge from './TierBadge';
 
-const KIND_TABS: [RankingFilter['kind'], string][] = [
-  ['all', '전체'],
-  ...(Object.entries(QUIZ_TYPE_LABEL) as [QuizType, string][]),
-];
 const PERIODS: [Period, string][] = [
   ['all', '전체 기간'],
   ['week', '최근 7일'],
   ['today', '오늘'],
 ];
 
-/** 명예의 전당: 타임어택 상위 기록 (시상대 Top 3 + 나머지 목록) */
+/** 명예의 전당: 도전 단계별 상위 기록 (시상대 Top 3 + 나머지 목록) */
 export default function HallOfFame({
   limit = 10,
-  initial = { kind: 'all', period: 'all' },
+  initial = { challenge: 10, period: 'all' },
   showPeriod = false,
 }: {
   limit?: number;
@@ -35,6 +31,7 @@ export default function HallOfFame({
   const [filter, setFilter] = useState<RankingFilter>(initial);
   const [rows, setRows] = useState<ScoreRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const ch = challengeOf(filter.challenge)!;
 
   const load = useCallback(async () => {
     if (!scoresEnabled) return;
@@ -62,7 +59,9 @@ export default function HallOfFame({
       <header className="hof-head">
         <div>
           <h2>🏆 명예의 전당</h2>
-          <p className="muted small">타임어택 20문제 최고 기록 Top {limit} · 같은 점수면 더 빨리 끝낸 순</p>
+          <p className="muted small">
+            {ch.title} ({ch.count}문제 · {formatLimit(ch.limitSec)}) Top {limit} · 같은 점수면 더 빨리 끝낸 순
+          </p>
         </div>
         {scoresEnabled && (
           <button className="ghost-btn" onClick={load} aria-label="새로고침">
@@ -72,15 +71,15 @@ export default function HallOfFame({
       </header>
 
       <div className="pill-tabs" role="tablist">
-        {KIND_TABS.map(([k, label]) => (
+        {CHALLENGES.map((c) => (
           <button
-            key={k}
+            key={c.count}
             role="tab"
-            aria-selected={filter.kind === k}
-            className={filter.kind === k ? 'active' : ''}
-            onClick={() => setFilter((f) => ({ ...f, kind: k }))}
+            aria-selected={filter.challenge === c.count}
+            className={filter.challenge === c.count ? 'active' : ''}
+            onClick={() => setFilter((f) => ({ ...f, challenge: c.count }))}
           >
-            {label}
+            {c.tier.emoji} {c.count}문제
           </button>
         ))}
       </div>
@@ -105,7 +104,7 @@ export default function HallOfFame({
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <p className="hof-empty">아직 기록이 없어요. 첫 번째 전설이 되어 보세요! 🚀</p>
+        <p className="hof-empty">아직 {ch.title} 기록이 없어요. 첫 번째 전설이 되어 보세요! 🚀</p>
       ) : (
         <>
           <div className="podium">
@@ -115,7 +114,7 @@ export default function HallOfFame({
                 <div key={r.id} className={`podium-spot place-${r.rank}`}>
                   <span className="podium-medal">{['🥇', '🥈', '🥉'][r.rank - 1] ?? r.rank}</span>
                   <strong className="podium-name">{r.nickname}</strong>
-                  <TierBadge score={r.score} />
+                  <TierBadge tier={tierOfRecord(r)} />
                   <span className="podium-score">{r.score.toLocaleString()}</span>
                   <div className="podium-block">{r.rank}</div>
                 </div>
@@ -124,7 +123,7 @@ export default function HallOfFame({
               ),
             )}
           </div>
-          {rest.length > 0 && <RankingList rows={[]} ranked={rest} showKind={filter.kind === 'all'} />}
+          {rest.length > 0 && <RankingList rows={[]} ranked={rest} />}
         </>
       )}
     </section>

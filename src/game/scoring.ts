@@ -1,7 +1,5 @@
 // 점수·콤보·티어 규칙을 한곳에 모아 둔다. 숫자만 바꾸면 게임 밸런스가 바뀐다.
 
-/** 타임어택 문제 수 (고정) */
-export const TIMEATTACK_COUNT = 20;
 /** 연습 모드 문제 수 */
 export const PRACTICE_COUNT = 10;
 /** 도시 문제: 이 거리 안을 클릭하면 정답 */
@@ -43,32 +41,59 @@ export function pointsFor(combo: number, elapsedMs: number, withSpeedBonus: bool
   return Math.round((BASE_POINTS + bonus) * comboMultiplier(combo));
 }
 
-// ── 티어(칭호): 타임어택 20문제 점수 기준 ──
+// ── 칭호와 타임어택 도전 단계 ──
 export interface Tier {
   id: string;
   name: string;
   emoji: string;
-  min: number;
   color: string; // 배지 색
 }
 
 export const TIERS: Tier[] = [
-  { id: 'bronze', name: '지리 브론즈', emoji: '🥉', min: 0, color: '#b45309' },
-  { id: 'silver', name: '지리 실버', emoji: '🥈', min: 1000, color: '#64748b' },
-  { id: 'gold', name: '지리 골드', emoji: '🥇', min: 2500, color: '#ca8a04' },
-  { id: 'grade1', name: '수능 1등급', emoji: '💎', min: 4500, color: '#7c3aed' },
-  { id: 'doctor', name: '지리박사', emoji: '🎓', min: 7000, color: '#0891b2' },
+  { id: 'bronze', name: '지리 브론즈', emoji: '🥉', color: '#b45309' },
+  { id: 'silver', name: '지리 실버', emoji: '🥈', color: '#64748b' },
+  { id: 'gold', name: '지리 골드', emoji: '🥇', color: '#ca8a04' },
+  { id: 'grade1', name: '수능 1등급', emoji: '💎', color: '#7c3aed' },
+  { id: 'doctor', name: '지리박사', emoji: '🎓', color: '#0891b2' },
 ];
+export const BASE_TIER = TIERS[0];
+export const tierById = (id: string) => TIERS.find((t) => t.id === id) ?? BASE_TIER;
 
-export function tierOf(score: number): Tier {
-  return [...TIERS].reverse().find((t) => score >= t.min) ?? TIERS[0];
+export type ChallengeCount = 10 | 20 | 40 | 60;
+
+export interface Challenge {
+  count: ChallengeCount; // 문제 수
+  limitSec: number; // 제한 시간
+  tier: Tier; // 성공하면 얻는 칭호
+  title: string;
 }
 
-/** 다음 티어와 남은 점수 (최고 티어면 null) */
-export function nextTier(score: number): { tier: Tier; remaining: number; progress: number } | null {
-  const cur = tierOf(score);
-  const idx = TIERS.indexOf(cur);
-  const next = TIERS[idx + 1];
-  if (!next) return null;
-  return { tier: next, remaining: next.min - score, progress: (score - cur.min) / (next.min - cur.min) };
+/** 문제 수가 많을수록 높은 칭호에 도전 */
+export const CHALLENGES: Challenge[] = [
+  { count: 10, limitSec: 60, tier: tierById('silver'), title: '지리 실버 도전' },
+  { count: 20, limitSec: 90, tier: tierById('gold'), title: '지리 골드 도전' },
+  { count: 40, limitSec: 150, tier: tierById('grade1'), title: '수능 1등급 도전' },
+  { count: 60, limitSec: 300, tier: tierById('doctor'), title: '지리박사 도전' },
+];
+export const challengeOf = (count: number | null | undefined) => CHALLENGES.find((c) => c.count === count) ?? null;
+
+/** 도전 성공 조건: 제한 시간 안에 모든 문제를 풀고, 정답률이 이 값 이상 */
+export const CLEAR_ACCURACY = 0.8;
+
+export function formatLimit(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s ? `${m}분 ${s}초` : `${m}분`;
+}
+
+/** 이 기록이 도전에 성공했는지 */
+export function isCleared(count: number | null | undefined, correct: number, answered: number, durationMs: number | null): boolean {
+  const c = challengeOf(count);
+  if (!c) return false;
+  return answered >= c.count && correct >= Math.ceil(c.count * CLEAR_ACCURACY) && (durationMs ?? 0) <= c.limitSec * 1000 + 500;
+}
+
+/** 기록의 칭호: 도전 성공이면 그 단계의 칭호, 아니면 지리 브론즈 */
+export function tierOfRecord(r: { challenge?: number | null; correct_count: number; total: number; duration_ms: number | null }): Tier {
+  return isCleared(r.challenge, r.correct_count, r.total, r.duration_ms) ? challengeOf(r.challenge)!.tier : BASE_TIER;
 }
