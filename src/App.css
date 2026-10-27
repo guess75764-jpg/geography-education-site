@@ -512,3 +512,32 @@ button.link.danger { color: var(--wrong); }
 .unlock-msg { font-weight: 800; color: #166534; background: #dcfce7; padding: 4px 10px; border-radius: 999px; animation: pop-in 0.3s ease-out; }
 .score-breakdown { margin: -6px 0 0; color: var(--muted); }
 .next-stage { width: 100%; }
+
+/* ── PDF로 개념 가져오기 ── */
+.pdf-import p { margin: 0; }
+.drop-zone { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 16px; border: 2px dashed #c7d2fe; border-radius: 14px; background: #f8faff; cursor: pointer; text-align: center; transition: background 0.15s, border-color 0.15s; }
+.drop-zone:hover, .drop-zone.over { background: #eef2ff; border-color: var(--primary); }
+.drop-icon { font-size: 2rem; }
+.paste-box { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.paste-box textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; resize: vertical; }
+.import-summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.import-summary .check { margin-left: auto; }
+.st { font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.st-auto { background: #dcfce7; color: #166534; }
+.st-check { background: #fef3c7; color: #92400e; }
+.st-none { background: #f1f5f9; color: #64748b; }
+.st-dup { background: #e0e7ff; color: #3730a3; }
+.import-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 620px; overflow-y: auto; }
+.import-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #f8fafc; border: 1px solid transparent; }
+.import-list li.on { background: #fff; border-color: #c7d2fe; }
+.import-list li.st-check { border-left: 4px solid #f59e0b; }
+.import-list li.st-none, .import-list li.dup { opacity: 0.65; }
+.import-list li > input[type='checkbox'] { margin-top: 10px; }
+.import-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.import-main textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; resize: vertical; line-height: 1.45; }
+.import-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.answer-edit { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.85rem; }
+.answer-edit input { width: 150px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+.cands, .tag-pick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.cands .chip, .tag-pick .chip { font-size: 0.75rem; padding: 2px 8px; }
+.source { margin: 0; word-break: keep-all; }

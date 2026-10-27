@@ -11,6 +11,7 @@ import {
 import { describeDbError } from '../../lib/scores';
 import { CHALLENGES } from '../../game/scoring';
 import { CITIES } from '../../data/cities';
+import ConceptImport from './ConceptImport';
 import type { Country } from '../../types';
 
 const TAGS = ['기후', '지형', '자원', '농업', '산업', '인구·문화'];
@@ -306,6 +307,8 @@ export default function AdminConcepts({
       </div>
 
       {msg && <p className={`admin-msg ${msg.error ? 'error' : ''}`}>{msg.text}</p>}
+
+      <ConceptImport countries={countries} existing={rows ?? []} onAdded={afterChange} />
 
       <form ref={formRef} className="card admin-section concept-form" onSubmit={save}>
         <h3>{form.editingId !== null ? '✏️ 개념 수정' : '➕ 개념 추가'}</h3>
