@@ -43,7 +43,7 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
     ) : (
       <p className="muted small">
         등록된 개념 {conceptCount}개
-        {conceptSource === 'builtin' && ' (인터넷 연결이 없어 기본 개념 사용)'}
+        {conceptSource === 'builtin' && ' (관리자 개념을 불러오지 못해 기본 개념 사용)'}
         {conceptCount < TIMEATTACK_COUNT && game.style === 'timeattack' && ` · ${TIMEATTACK_COUNT}개보다 적어 일부 반복돼요`}
       </p>
     );
