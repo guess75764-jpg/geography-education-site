@@ -35,11 +35,14 @@ type Status = 'idle' | 'checking' | 'choose' | 'saving' | 'saved' | 'discarded' 
 export default function ScoreBoard({
   result,
   onOpenRanking,
+  initialNickname,
 }: {
   result: Omit<NewScore, 'nickname'>;
   onOpenRanking?: () => void;
+  /** 게임을 시작할 때 쓴 별명 */
+  initialNickname?: string;
 }) {
-  const [nickname, setNickname] = useState(loadNickname);
+  const [nickname, setNickname] = useState(() => initialNickname || loadNickname());
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [previous, setPrevious] = useState<MyScore[]>([]);

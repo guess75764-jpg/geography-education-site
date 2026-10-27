@@ -17,14 +17,16 @@
 - **콤보 배수**: 연속 정답 3개 ×1.5 → 6개 ×2 → 9개 ×2.5 → 12개 ×3, 틀리면 초기화
 - **타임어택 도전 단계** (`CHALLENGES`)
 
-  | 도전 | 문제 수 | 제한 시간 | 성공하면 |
-  |---|---|---|---|
-  | 지리 실버 도전 | 10 | 1분 | 🥈 지리 실버 |
-  | 지리 골드 도전 | 20 | 1분 30초 | 🥇 지리 골드 |
-  | 수능 1등급 도전 | 40 | 2분 30초 | 💎 수능 1등급 |
-  | 지리박사 도전 | 60 | 5분 | 🎓 지리박사 |
+  | 도전 | 문제 수 | 제한 시간 | 속도 보너스(문제당 최대) | 남은 시간 보너스 | 성공하면 |
+  |---|---|---|---|---|---|
+  | 지리 실버 도전 | 10 | 1분 | +100 | 1초당 20점 | 🥈 지리 실버 + 골드 열림 |
+  | 지리 골드 도전 | 20 | 1분 30초 | +150 | 1초당 30점 | 🥇 지리 골드 + 1등급 열림 |
+  | 수능 1등급 도전 | 40 | 2분 30초 | +200 | 1초당 40점 | 💎 수능 1등급 + 박사 열림 |
+  | 지리박사 도전 | 60 | 5분 | +250 | 1초당 50점 | 🎓 지리박사 |
 
-  성공 = 제한 시간 안에 모두 풀고 정답률 80% 이상 (`CLEAR_ACCURACY`). 실패하면 🥉 지리 브론즈.
+  - 처음엔 **실버만 열림**. 시간 안에 **모두 맞히면** 성공(`CLEAR_ACCURACY = 1`) → 그 단계 칭호 + 다음 단계 열림. 실패하면 🥉 지리 브론즈.
+  - 열린 단계는 언제든 다시 도전 가능. 잠금 상태는 **별명별로 이 브라우저에** 저장 (`src/lib/progress.ts`).
+  - 점수 = Σ(기본 100 + 속도 보너스) × 콤보 배수 + 남은 시간 보너스(모두 풀었을 때만)
 - 명예의 전당은 도전 단계별 순위 (같은 점수면 빨리 끝낸 순)
 - **내 기록 갱신**: 같은 브라우저 + 같은 별명으로 같은 도전 기록이 있으면 “이번 기록으로 갱신(이전 기록 자동 삭제)” 또는 “이번 기록 지우기”를 고름. 다른 학생은 남의 기록을 지울 수 없음 (DB 함수 `submit_score` 가 처리)
 
@@ -64,6 +66,7 @@ npm run build:html  # HTML 파일 하나로 묶기 → dist-single/index.html
    - `supabase/migrations/001_create_scores.sql` (기록 표)
    - `supabase/migrations/002_admin_and_concepts.sql` (관리자·개념 표 + 시작용 개념 24개)
    - `supabase/migrations/003_challenges_and_my_records.sql` (도전 단계 + 내 기록 갱신)
+   - `supabase/migrations/004_scoring_update.sql` (새 점수 규칙에 맞춘 최대 점수 검사)
 2. **관리자 계정** — Authentication → Users → Add user → Create new user (이메일·비밀번호, **Auto Confirm User** 체크) 후 SQL Editor 에서
    `insert into public.admins (user_id) select id from auth.users where email = '선생님이메일';`
    - 권장: Authentication → Sign In / Providers 에서 **Allow new users to sign up** 끄기 (관리자 외 가입 차단)

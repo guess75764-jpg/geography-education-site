@@ -15,8 +15,9 @@ export const SPEED_WINDOW_MS = 8000;
 /** 정답 후 다음 문제로 넘어가기까지 (타임어택) */
 export const FEEDBACK_MS = { correct: 700, wrong: 1500 };
 
-export function speedBonus(elapsedMs: number): number {
-  return Math.round(SPEED_BONUS_MAX * Math.max(0, 1 - elapsedMs / SPEED_WINDOW_MS));
+/** 빨리 맞힐수록 큰 속도 보너스. max 는 도전 단계마다 다르다 (높은 단계일수록 큼) */
+export function speedBonus(elapsedMs: number, max: number = SPEED_BONUS_MAX): number {
+  return Math.round(max * Math.max(0, 1 - elapsedMs / SPEED_WINDOW_MS));
 }
 
 /** 연속 정답 수에 따른 점수 배수: 3콤보 ×1.5, 6콤보 ×2, 9콤보 ×2.5, 12콤보 이상 ×3 */
@@ -35,9 +36,9 @@ export function combosToNextMultiplier(combo: number): number | null {
   return next === undefined ? null : next - combo;
 }
 
-/** 정답 1개의 점수. combo 는 이번 정답을 포함한 연속 정답 수 */
-export function pointsFor(combo: number, elapsedMs: number, withSpeedBonus: boolean): number {
-  const bonus = withSpeedBonus ? speedBonus(elapsedMs) : 0;
+/** 정답 1개의 점수 = (기본 + 속도 보너스) × 콤보 배수. combo 는 이번 정답을 포함한 연속 정답 수 */
+export function pointsFor(combo: number, elapsedMs: number, speedMax: number): number {
+  const bonus = speedMax > 0 ? speedBonus(elapsedMs, speedMax) : 0;
   return Math.round((BASE_POINTS + bonus) * comboMultiplier(combo));
 }
 
@@ -64,21 +65,38 @@ export type ChallengeCount = 10 | 20 | 40 | 60;
 export interface Challenge {
   count: ChallengeCount; // 문제 수
   limitSec: number; // 제한 시간
+  speedMax: number; // 문제당 최대 속도 보너스 (높은 단계일수록 큼)
+  timeBonusPerSec: number; // 모두 풀었을 때 남은 시간 1초당 보너스
   tier: Tier; // 성공하면 얻는 칭호
   title: string;
 }
 
 /** 문제 수가 많을수록 높은 칭호에 도전 */
 export const CHALLENGES: Challenge[] = [
-  { count: 10, limitSec: 60, tier: tierById('silver'), title: '지리 실버 도전' },
-  { count: 20, limitSec: 90, tier: tierById('gold'), title: '지리 골드 도전' },
-  { count: 40, limitSec: 150, tier: tierById('grade1'), title: '수능 1등급 도전' },
-  { count: 60, limitSec: 300, tier: tierById('doctor'), title: '지리박사 도전' },
+  { count: 10, limitSec: 60, speedMax: 100, timeBonusPerSec: 20, tier: tierById('silver'), title: '지리 실버 도전' },
+  { count: 20, limitSec: 90, speedMax: 150, timeBonusPerSec: 30, tier: tierById('gold'), title: '지리 골드 도전' },
+  { count: 40, limitSec: 150, speedMax: 200, timeBonusPerSec: 40, tier: tierById('grade1'), title: '수능 1등급 도전' },
+  { count: 60, limitSec: 300, speedMax: 250, timeBonusPerSec: 50, tier: tierById('doctor'), title: '지리박사 도전' },
 ];
 export const challengeOf = (count: number | null | undefined) => CHALLENGES.find((c) => c.count === count) ?? null;
 
-/** 도전 성공 조건: 제한 시간 안에 모든 문제를 풀고, 정답률이 이 값 이상 */
-export const CLEAR_ACCURACY = 0.8;
+/** 도전 성공 조건: 제한 시간 안에 모든 문제를 풀고, 정답률이 이 값 이상 (1 = 모두 정답).
+ *  성공하면 그 단계의 칭호를 얻고 다음 단계가 열린다. */
+export const CLEAR_ACCURACY = 1;
+
+/** 이 단계에 도전하려면 먼저 성공해야 하는 단계 (실버는 처음부터 열림) */
+export function prerequisiteOf(count: ChallengeCount): Challenge | null {
+  const i = CHALLENGES.findIndex((c) => c.count === count);
+  return i > 0 ? CHALLENGES[i - 1] : null;
+}
+
+/** 모든 문제를 시간 안에 풀었을 때만 주는 남은 시간 보너스 */
+export function timeBonusFor(count: ChallengeCount, answered: number, elapsedMs: number): number {
+  const c = challengeOf(count);
+  if (!c || answered < c.count) return 0;
+  const leftSec = Math.max(0, Math.floor((c.limitSec * 1000 - elapsedMs) / 1000));
+  return leftSec * c.timeBonusPerSec;
+}
 
 export function formatLimit(sec: number): string {
   const m = Math.floor(sec / 60);

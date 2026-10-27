@@ -84,6 +84,22 @@ export default function App() {
 
   // ── 게임 모드 ──
   const game = useGame(countries, CITIES, concepts.hints);
+  // 타임어택 별명 (다음에 왔을 때도 기억)
+  const [playerName, setPlayerName] = useState(() => {
+    try {
+      return localStorage.getItem('geo-quiz:nickname') ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const changePlayerName = (name: string) => {
+    setPlayerName(name);
+    try {
+      localStorage.setItem('geo-quiz:nickname', name.trim());
+    } catch {
+      /* 저장 못 해도 무시 */
+    }
+  };
   // ── 개념 공부 ──
   const study = useStudy(concepts.hints);
   usePreloadCharacters();
@@ -97,9 +113,11 @@ export default function App() {
     // 관리자 화면을 벗어나면 주소의 #admin 을 지운다
     if (m !== 'admin' && window.location.hash === '#admin') history.replaceState(null, '', window.location.pathname + window.location.search);
   };
+  // 홈의 도전 카드: 별명 입력과 잠금 확인이 필요하므로 시작 화면을 연다
   const startFromHome = (challenge: ChallengeCount) => {
-    setMode('game');
-    game.start({ style: 'timeattack', challenge });
+    switchMode('game');
+    game.setStyle('timeattack');
+    game.setChallenge(challenge);
   };
   const openStudy = () => {
     setLearnView('study');
@@ -333,7 +351,14 @@ export default function App() {
               onShowAll={() => (learnView === 'country' ? fitCountries(selCountries) : fitCities(selCities))}
             />
           ) : (
-            <GamePanel game={game} countryById={countryById} onOpenRanking={openRankingFromGame} conceptSource={concepts.source} />
+            <GamePanel
+              game={game}
+              countryById={countryById}
+              onOpenRanking={openRankingFromGame}
+              conceptSource={concepts.source}
+              playerName={playerName}
+              onPlayerNameChange={changePlayerName}
+            />
           )}
         </main>
       )}

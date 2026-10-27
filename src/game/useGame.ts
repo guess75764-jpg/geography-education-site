@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { geoArea, geoDistance } from 'd3-geo';
 import type { City, Country } from '../types';
 import type { GeoHint } from '../data/hints';
-import { CITY_TOLERANCE_KM, FEEDBACK_MS, PRACTICE_COUNT, challengeOf, pointsFor, type ChallengeCount } from './scoring';
+import { CITY_TOLERANCE_KM, FEEDBACK_MS, PRACTICE_COUNT, challengeOf, pointsFor, timeBonusFor, type ChallengeCount } from './scoring';
 
 /** 문제 유형 */
 export type QuizType = 'country' | 'city' | 'mixed' | 'hint';
@@ -138,7 +138,10 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
   const timeLeftMs = isTimed ? (phase === 'ready' || phase === 'countdown' ? limitMs : Math.max(0, limitMs - elapsedMs)) : 0;
   const current = phase === 'playing' || phase === 'answered' ? queue[index] ?? null : null;
   const lastResult = phase === 'answered' ? results[results.length - 1] ?? null : null;
-  const score = results.reduce((s, r) => s + r.points, 0);
+  const answerPoints = results.reduce((s, r) => s + r.points, 0);
+  /** 타임어택에서 모든 문제를 시간 안에 풀면 남은 시간만큼 보너스 (게임이 끝난 뒤 더해짐) */
+  const timeBonus = isTimed && phase === 'finished' ? timeBonusFor(challenge, results.length, elapsedMs) : 0;
+  const score = answerPoints + timeBonus;
   const maxCombo = results.reduce((m, r) => Math.max(m, r.combo), 0);
 
   /** 타임어택은 항상 관리자 개념(개념+위치) 문제, 연습은 고른 유형 */
@@ -212,7 +215,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
         correct = distanceKm <= CITY_TOLERANCE_KM;
       }
       const nextCombo = correct ? combo + 1 : 0;
-      const points = correct ? pointsFor(nextCombo, elapsedMs, isTimed) : 0;
+      const points = correct ? pointsFor(nextCombo, elapsedMs, isTimed ? challengeOf(challenge)?.speedMax ?? 0 : 0) : 0;
       setCombo(nextCombo);
       setResults((rs) => [
         ...rs,
@@ -220,7 +223,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
       ]);
       setPhase('answered');
     },
-    [phase, current, combo, isTimed],
+    [phase, current, combo, isTimed, challenge],
   );
 
   const next = useCallback(() => {
@@ -266,6 +269,8 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
     /** 이 유형의 문제 은행 크기 (개념이 0개면 시작할 수 없음) */
     poolSize: (t: QuizType) => poolFor(t).length,
     score,
+    answerPoints,
+    timeBonus,
     combo,
     maxCombo,
     elapsedMs,

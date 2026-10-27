@@ -505,3 +505,10 @@ button.link.danger { color: var(--wrong); }
 .coverage-chip { font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
 .coverage-chip.ok { background: #dcfce7; color: #166534; }
 .coverage-chip.no { background: #fef3c7; color: #92400e; }
+.challenge-card.locked { opacity: 0.6; background: #f8fafc; }
+.challenge-card.locked strong { color: var(--muted); }
+.challenge-card.locked.active { box-shadow: none; border-color: #cbd5e1; }
+.name-input { font-weight: 600 !important; }
+.unlock-msg { font-weight: 800; color: #166534; background: #dcfce7; padding: 4px 10px; border-radius: 999px; animation: pop-in 0.3s ease-out; }
+.score-breakdown { margin: -6px 0 0; color: var(--muted); }
+.next-stage { width: 100%; }

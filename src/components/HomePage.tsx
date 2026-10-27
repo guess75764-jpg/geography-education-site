@@ -1,4 +1,4 @@
-import { BASE_TIER, CHALLENGES, CLEAR_ACCURACY, formatLimit, type ChallengeCount } from '../game/scoring';
+import { BASE_TIER, CHALLENGES, formatLimit, type ChallengeCount } from '../game/scoring';
 import HallOfFame from './HallOfFame';
 
 /** 메인 화면: 개념 공부 · 타임어택 도전 카드 + 명예의 전당 + 칭호 안내 */
@@ -56,7 +56,8 @@ export default function HomePage({
             ))}
           </div>
           <p className="muted small">
-            시간 안에 모두 풀고 정답률 {Math.round(CLEAR_ACCURACY * 100)}% 이상이면 도전 성공! 성공한 단계의 칭호가 명예의 전당에 표시돼요.
+            처음엔 🥈 실버부터! 시간 안에 <b>모두 맞히면</b> 그 단계의 칭호를 얻고 다음 단계가 열려요. 열린 단계는 언제든 다시 도전할 수
+            있어요. 빨리, 연속으로 맞힐수록 점수가 높고 높은 단계일수록 보너스가 커져요.
           </p>
 
           <h3>더 해 보기</h3>
@@ -85,7 +86,7 @@ export default function HomePage({
                 <span className="tier-emoji">{c.tier.emoji}</span>
                 <strong>{c.tier.name}</strong>
                 <span className="muted">
-                  {c.count}문제 · {formatLimit(c.limitSec)} 도전 성공
+                  {c.count}문제 · {formatLimit(c.limitSec)} 안에 모두 정답
                 </span>
               </li>
             ))}

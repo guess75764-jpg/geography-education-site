@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { QUIZ_TYPE_LABEL, type GameState, type QuizType } from '../game/useGame';
 import {
   BASE_POINTS,
@@ -11,8 +11,11 @@ import {
   comboMultiplier,
   formatLimit,
   isCleared,
+  prerequisiteOf,
   speedBonus,
+  type Challenge,
 } from '../game/scoring';
+import { isUnlocked, markCleared } from '../lib/progress';
 import { fireFinish } from '../game/fx';
 import type { Country } from '../types';
 import ScoreBoard from './ScoreBoard';
@@ -25,6 +28,9 @@ interface Props {
   onOpenRanking?: () => void;
   /** 개념 문제를 어디서 불러왔는지 (db: 관리자 등록, builtin: 예비 문제) */
   conceptSource: 'loading' | 'db' | 'builtin';
+  /** 타임어택 별명 (단계 잠금 해제와 기록에 쓰임) */
+  playerName: string;
+  onPlayerNameChange: (name: string) => void;
 }
 
 const PRACTICE_TYPES: [QuizType, string, string][] = [
@@ -33,7 +39,7 @@ const PRACTICE_TYPES: [QuizType, string, string][] = [
   ['mixed', '🎲', '국가 + 도시 무작위'],
 ];
 
-export default function GamePanel({ game, countryById, onOpenRanking, conceptSource }: Props) {
+export default function GamePanel({ game, countryById, onOpenRanking, conceptSource, playerName, onPlayerNameChange }: Props) {
   const { phase, current, lastResult } = game;
   const conceptCount = game.poolSize('hint');
 
@@ -41,6 +47,9 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
   if (phase === 'ready') {
     const isTA = game.style === 'timeattack';
     const ch = challengeOf(game.challenge)!;
+    const name = playerName.trim();
+    const unlocked = (c: Challenge) => isUnlocked(name, c.count);
+    const chOpen = unlocked(ch);
     return (
       <aside className="panel game-panel">
         <h2>🎯 게임</h2>
@@ -55,23 +64,37 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
 
         {isTA ? (
           <>
+            <label className="field">
+              내 별명 <span className="muted small">(단계 잠금 해제와 기록에 쓰여요 · 실명 대신 별명)</span>
+              <input
+                className="name-input"
+                placeholder="별명 (최대 20자)"
+                maxLength={20}
+                value={playerName}
+                onChange={(e) => onPlayerNameChange(e.target.value)}
+              />
+            </label>
             <div className="field">
               도전 단계
               <div className="challenge-grid">
-                {CHALLENGES.map((c) => (
-                  <button
-                    key={c.count}
-                    className={`challenge-card ${game.challenge === c.count ? 'active' : ''}`}
-                    style={{ '--tier': c.tier.color } as React.CSSProperties}
-                    onClick={() => game.setChallenge(c.count)}
-                  >
-                    <span className="challenge-emoji">{c.tier.emoji}</span>
-                    <strong>{c.title}</strong>
-                    <span className="small">
-                      {c.count}문제 · {formatLimit(c.limitSec)}
-                    </span>
-                  </button>
-                ))}
+                {CHALLENGES.map((c) => {
+                  const open = unlocked(c);
+                  const pre = prerequisiteOf(c.count);
+                  return (
+                    <button
+                      key={c.count}
+                      className={`challenge-card ${game.challenge === c.count ? 'active' : ''} ${open ? '' : 'locked'}`}
+                      style={{ '--tier': c.tier.color } as React.CSSProperties}
+                      onClick={() => game.setChallenge(c.count)}
+                    >
+                      <span className="challenge-emoji">{open ? c.tier.emoji : '🔒'}</span>
+                      <strong>{c.title}</strong>
+                      <span className="small">
+                        {open ? `${c.count}문제 · ${formatLimit(c.limitSec)}` : `${pre?.title.replace(' 도전', '')} ${pre?.count}문제 모두 정답 시 열림`}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <ul className="rules small">
@@ -79,13 +102,16 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
                 관리자가 등록한 개념 {ch.count}문제를 <b>{formatLimit(ch.limitSec)}</b> 안에 풀어요
               </li>
               <li>
-                모두 풀고 정답률 {Math.round(CLEAR_ACCURACY * 100)}% 이상({Math.ceil(ch.count * CLEAR_ACCURACY)}문제)이면{' '}
+                {CLEAR_ACCURACY >= 1 ? '모두 맞히면' : `정답률 ${Math.round(CLEAR_ACCURACY * 100)}% 이상이면`}{' '}
                 <b>
                   {ch.tier.emoji} {ch.tier.name}
                 </b>{' '}
-                달성!
+                달성{CHALLENGES[CHALLENGES.indexOf(ch) + 1] ? ` + ${CHALLENGES[CHALLENGES.indexOf(ch) + 1].title} 열림` : ''}!
               </li>
-              <li>정답 {BASE_POINTS}점 + 속도 보너스, 🔥 연속 정답이면 배수 ×1.5~×3</li>
+              <li>
+                정답 {BASE_POINTS}점 + <b>빨리 맞힐수록 최대 +{ch.speedMax}</b> × <b>🔥 연속 정답 배수 ×1.5~×3</b>
+              </li>
+              <li>모두 풀면 남은 시간 1초당 +{ch.timeBonusPerSec}점</li>
             </ul>
             {conceptSource === 'loading' ? (
               <p className="muted small">개념 문제를 불러오는 중…</p>
@@ -98,8 +124,21 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
                 {conceptCount < ch.count && ` · ${ch.count}개보다 적어 일부 반복돼요`}
               </p>
             )}
-            <button className="primary big" disabled={conceptCount === 0} onClick={() => game.start({ style: 'timeattack' })}>
-              ⏱ {ch.title} 시작!
+            {!name ? (
+              <p className="hint small">별명을 먼저 입력하세요.</p>
+            ) : (
+              !chOpen && (
+                <p className="hint small">
+                  🔒 {prerequisiteOf(ch.count)?.title}의 {prerequisiteOf(ch.count)?.count}문제를 모두 맞혀야 도전할 수 있어요.
+                </p>
+              )
+            )}
+            <button
+              className="primary big"
+              disabled={conceptCount === 0 || !name || !chOpen}
+              onClick={() => game.start({ style: 'timeattack' })}
+            >
+              {chOpen ? `⏱ ${ch.title} 시작!` : '🔒 아직 잠겨 있어요'}
             </button>
           </>
         ) : (
@@ -148,7 +187,7 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
     );
   }
 
-  if (phase === 'finished') return <ResultPanel game={game} onOpenRanking={onOpenRanking} />;
+  if (phase === 'finished') return <ResultPanel game={game} onOpenRanking={onOpenRanking} playerName={playerName.trim()} />;
 
   if (!current) return null;
   const isTimed = game.style === 'timeattack';
@@ -196,7 +235,7 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
               </strong>
               <p className="breakdown small">
                 기본 {BASE_POINTS}
-                {isTimed && ` + 속도 ${speedBonus(lastResult.elapsedMs)}`}
+                {isTimed && ` + 속도 ${speedBonus(lastResult.elapsedMs, challengeOf(game.challenge)?.speedMax)}`}
                 {comboMultiplier(lastResult.combo) > 1 && ` × 콤보 ${comboMultiplier(lastResult.combo)}`} ·{' '}
                 {(lastResult.elapsedMs / 1000).toFixed(1)}초
               </p>
@@ -232,7 +271,7 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
 }
 
 /** 결과 화면: 도전 성공 여부·칭호·통계·기록 저장 */
-function ResultPanel({ game, onOpenRanking }: { game: GameState; onOpenRanking?: () => void }) {
+function ResultPanel({ game, onOpenRanking, playerName }: { game: GameState; onOpenRanking?: () => void; playerName: string }) {
   const { results, score } = game;
   const correct = results.filter((r) => r.correct).length;
   const accuracy = results.length ? Math.round((correct / results.length) * 100) : 0;
@@ -241,6 +280,11 @@ function ResultPanel({ game, onOpenRanking }: { game: GameState; onOpenRanking?:
   const cleared = isTimed && isCleared(ch.count, correct, results.length, game.elapsedMs);
   const timedOut = isTimed && results.length < ch.count;
   const nextCh = CHALLENGES[CHALLENGES.indexOf(ch) + 1];
+  // 성공하면 다음 단계 열기 (이번에 처음 열렸을 때만 알림)
+  const [newlyUnlocked] = useState(() => (cleared && nextCh && !isUnlocked(playerName, nextCh.count) ? nextCh : null));
+  useEffect(() => {
+    if (cleared) markCleared(playerName, ch.count);
+  }, [cleared, playerName, ch.count]);
 
   useEffect(() => {
     // 도전에 성공했을 때만 축하 폭죽 (연습은 다 맞히면)
@@ -259,7 +303,11 @@ function ResultPanel({ game, onOpenRanking }: { game: GameState; onOpenRanking?:
             <>
               <span className="clear-title">🎉 도전 성공!</span>
               <TierBadge tier={ch.tier} size="lg" />
-              {nextCh && <span className="small">다음은 {nextCh.title}({nextCh.count}문제)에 도전해 보세요!</span>}
+              {newlyUnlocked ? (
+                <span className="unlock-msg">🔓 {newlyUnlocked.title}({newlyUnlocked.count}문제)이 열렸어요!</span>
+              ) : (
+                nextCh && <span className="small">{nextCh.title}({nextCh.count}문제)에 도전해 보세요!</span>
+              )}
             </>
           ) : (
             <>
@@ -267,7 +315,9 @@ function ResultPanel({ game, onOpenRanking }: { game: GameState; onOpenRanking?:
               <span className="small">
                 {timedOut
                   ? `시간 안에 ${results.length}/${ch.count}문제를 풀었어요.`
-                  : `정답 ${correct}개 · ${Math.ceil(ch.count * CLEAR_ACCURACY)}개 이상 맞혀야 성공이에요.`}
+                  : CLEAR_ACCURACY >= 1
+                    ? `${ch.count - correct}문제를 틀렸어요. 모두 맞혀야 성공이에요.`
+                    : `정답 ${correct}개 · ${Math.ceil(ch.count * CLEAR_ACCURACY)}개 이상 맞혀야 성공이에요.`}
               </span>
             </>
           )}
@@ -277,6 +327,12 @@ function ResultPanel({ game, onOpenRanking }: { game: GameState; onOpenRanking?:
         {score.toLocaleString()}
         <small>점</small>
       </p>
+      {isTimed && (
+        <p className="score-breakdown small">
+          문제 점수 {game.answerPoints.toLocaleString()}
+          {game.timeBonus > 0 ? ` + 남은 시간 보너스 ${game.timeBonus.toLocaleString()}` : ' · 남은 시간 보너스는 모든 문제를 풀었을 때만'}
+        </p>
+      )}
       <div className="stat-grid">
         <div>
           <b>
@@ -301,6 +357,7 @@ function ResultPanel({ game, onOpenRanking }: { game: GameState; onOpenRanking?:
       {isTimed ? (
         results.length > 0 ? (
           <ScoreBoard
+            initialNickname={playerName}
             result={{
               challenge: ch.count,
               score,
@@ -318,8 +375,13 @@ function ResultPanel({ game, onOpenRanking }: { game: GameState; onOpenRanking?:
         <p className="muted small">연습 기록은 명예의 전당에 올라가지 않아요.</p>
       )}
 
+      {cleared && nextCh && (
+        <button className="primary big next-stage" onClick={() => game.start({ style: 'timeattack', challenge: nextCh.count })}>
+          {nextCh.tier.emoji} {nextCh.title} 하러 가기 →
+        </button>
+      )}
       <div className="result-actions">
-        <button className="primary" onClick={() => game.start()}>
+        <button className={cleared && nextCh ? 'secondary' : 'primary'} onClick={() => game.start()}>
           ↻ 다시 도전
         </button>
         <button className="secondary" onClick={game.reset}>
