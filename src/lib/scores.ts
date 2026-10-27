@@ -11,6 +11,7 @@ export interface ScoreRow {
   quiz_kind: QuizType;
   game_mode: PlayStyle;
   max_combo: number;
+  duration_ms: number | null; // 타임어택 20문제에 걸린 시간
   created_at: string;
 }
 
@@ -74,7 +75,8 @@ export async function fetchRanking(f: RankingFilter, limit = 10): Promise<ScoreR
   if (!supabase) return [];
   const { data, error } = await baseQuery(f, '*')
     .order('score', { ascending: false })
-    .order('created_at', { ascending: true }) // 같은 점수면 먼저 세운 기록이 위
+    .order('duration_ms', { ascending: true, nullsFirst: false }) // 같은 점수면 더 빨리 끝낸 기록이 위
+    .order('created_at', { ascending: true })
     .limit(limit);
   if (error) throw error;
   return data as unknown as ScoreRow[];
@@ -97,4 +99,26 @@ export function withRanks<T extends { score: number }>(rows: T[]): (T & { rank: 
     prev = { score: r.score, rank };
     return { ...r, rank };
   });
+}
+
+// ───────────── 관리자 전용 (DB 보안 규칙상 관리자 로그인 상태에서만 성공) ─────────────
+
+/** 관리 화면용 기록 목록: 연습 기록 포함, 별명 검색 */
+export async function fetchScoresAdmin(opts: { kind: QuizType | 'all'; search: string; limit?: number }): Promise<ScoreRow[]> {
+  if (!supabase) return [];
+  let q = supabase.from('scores').select('*');
+  if (opts.kind !== 'all') q = q.eq('quiz_kind', opts.kind);
+  const term = opts.search.trim();
+  if (term) q = q.ilike('nickname', `%${term.replace(/[%_]/g, (m) => '\\' + m)}%`);
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(opts.limit ?? 300);
+  if (error) throw error;
+  return data as ScoreRow[];
+}
+
+/** 기록 삭제. 실제로 지워진 개수를 돌려준다 (권한이 없으면 0) */
+export async function deleteScores(ids: number[]): Promise<number> {
+  if (!supabase || ids.length === 0) return 0;
+  const { data, error } = await supabase.from('scores').delete().in('id', ids).select('id');
+  if (error) throw error;
+  return data?.length ?? 0;
 }

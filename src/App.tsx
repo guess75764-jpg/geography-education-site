@@ -6,8 +6,10 @@ import GameHud, { type FloatingPoint } from './components/GameHud';
 import ReviewList from './components/ReviewList';
 import RankingPage from './components/RankingPage';
 import HomePage from './components/HomePage';
+import AdminPage from './components/admin/AdminPage';
 import Celebration, { usePreloadCharacters } from './components/Celebration';
 import { useWorldData } from './hooks/useWorldData';
+import { useConcepts } from './hooks/useConcepts';
 import { useGame, type QuizType } from './game/useGame';
 import { comboMultiplier } from './game/scoring';
 import { fireComboLevelUp, fireCorrect } from './game/fx';
@@ -33,7 +35,16 @@ export default function App() {
   const countries = useWorldData();
   const countryById = useMemo(() => new Map(countries.map((c) => [c.id, c])), [countries]);
 
-  const [mode, setMode] = useState<Mode>('home');
+  // 주소 끝이 #admin 이면 관리자 화면으로 바로 연다
+  const [mode, setMode] = useState<Mode>(() => (window.location.hash === '#admin' ? 'admin' : 'home'));
+  useEffect(() => {
+    const onHash = () => window.location.hash === '#admin' && setMode('admin');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  // 개념+위치 문제: 관리자가 등록한 개념 (없으면 기본 개념)
+  const concepts = useConcepts();
 
   // ── 학습 모드: 국가 지도 / 도시 지도 각각 여러 개 선택 ──
   const [learnView, setLearnView] = useState<LearnView>('country');
@@ -69,7 +80,7 @@ export default function App() {
   };
 
   // ── 게임 모드 ──
-  const game = useGame(countries, CITIES);
+  const game = useGame(countries, CITIES, concepts.hints);
   usePreloadCharacters();
 
   // ── 명예의 전당 ──
@@ -78,6 +89,8 @@ export default function App() {
   const switchMode = (m: Mode) => {
     setMode(m);
     game.reset();
+    // 관리자 화면을 벗어나면 주소의 #admin 을 지운다
+    if (m !== 'admin' && window.location.hash === '#admin') history.replaceState(null, '', window.location.pathname + window.location.search);
   };
   const startFromHome = (t: QuizType) => {
     setMode('game');
@@ -196,6 +209,10 @@ export default function App() {
         <main className="page">
           <HomePage onStart={startFromHome} onLearn={() => switchMode('learn')} />
         </main>
+      ) : mode === 'admin' ? (
+        <main className="page">
+          <AdminPage countries={countries} countryById={countryById} onConceptsChanged={concepts.reload} />
+        </main>
       ) : mode === 'ranking' ? (
         <main className="page narrow">
           <RankingPage initial={rankingFilter} />
@@ -237,6 +254,7 @@ export default function App() {
 
           {mode === 'learn' ? (
             <LearnPanel
+              hints={concepts.hints}
               view={learnView}
               onViewChange={setLearnView}
               countries={countries}
@@ -258,10 +276,16 @@ export default function App() {
               onShowAll={() => (learnView === 'country' ? fitCountries(selCountries) : fitCities(selCities))}
             />
           ) : (
-            <GamePanel game={game} countryById={countryById} onOpenRanking={openRankingFromGame} />
+            <GamePanel game={game} countryById={countryById} onOpenRanking={openRankingFromGame} conceptSource={concepts.source} />
           )}
         </main>
       )}
+      <footer className="footer">
+        <span>🌏 세계지도 퀴즈 · 통합사회·수능 지리 학습용</span>
+        <button className="link small" onClick={() => switchMode('admin')}>
+          🔐 관리자
+        </button>
+      </footer>
     </div>
   );
 }

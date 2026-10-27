@@ -1,7 +1,7 @@
 // 점수·콤보·티어 규칙을 한곳에 모아 둔다. 숫자만 바꾸면 게임 밸런스가 바뀐다.
 
-/** 타임어택 제한 시간 */
-export const TIME_LIMIT_SEC = 60;
+/** 타임어택 문제 수 (고정) */
+export const TIMEATTACK_COUNT = 20;
 /** 연습 모드 문제 수 */
 export const PRACTICE_COUNT = 10;
 /** 도시 문제: 이 거리 안을 클릭하면 정답 */
@@ -43,7 +43,7 @@ export function pointsFor(combo: number, elapsedMs: number, withSpeedBonus: bool
   return Math.round((BASE_POINTS + bonus) * comboMultiplier(combo));
 }
 
-// ── 티어(칭호): 타임어택 점수 기준 ──
+// ── 티어(칭호): 타임어택 20문제 점수 기준 ──
 export interface Tier {
   id: string;
   name: string;
@@ -57,7 +57,7 @@ export const TIERS: Tier[] = [
   { id: 'silver', name: '지리 실버', emoji: '🥈', min: 1000, color: '#64748b' },
   { id: 'gold', name: '지리 골드', emoji: '🥇', min: 2500, color: '#ca8a04' },
   { id: 'grade1', name: '수능 1등급', emoji: '💎', min: 4500, color: '#7c3aed' },
-  { id: 'citizen', name: '세계시민', emoji: '🌏', min: 7000, color: '#0891b2' },
+  { id: 'doctor', name: '지리박사', emoji: '🎓', min: 7000, color: '#0891b2' },
 ];
 
 export function tierOf(score: number): Tier {

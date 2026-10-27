@@ -1,13 +1,11 @@
 import { useMemo, useState } from 'react';
 import { colorAt } from '../data/palette';
-import { GEO_HINTS, type CountryHint } from '../data/hints';
-
-const HINT_BY_COUNTRY = new Map(
-  GEO_HINTS.filter((h): h is CountryHint => h.kind === 'country').map((h) => [h.countryId, h]),
-);
+import type { GeoHint } from '../data/hints';
 import type { City, Country, LearnView } from '../types';
 
 interface Props {
+  /** 관리자가 등록한 개념 (선택한 나라의 개념 포인트 카드에 표시) */
+  hints: GeoHint[];
   view: LearnView;
   onViewChange: (v: LearnView) => void;
   countries: Country[];
@@ -22,6 +20,7 @@ interface Props {
 }
 
 export default function LearnPanel({
+  hints,
   view,
   onViewChange,
   countries,
@@ -153,27 +152,36 @@ export default function LearnPanel({
         )}
       </div>
 
-      {/* 수능 포인트: 선택한 나라 중 힌트 데이터가 있는 나라의 기후·자원 */}
+      {/* 개념 포인트: 선택한 나라와 관련된 개념(관리자 등록) */}
       {isCountry &&
-        selectedCountryIds
-          .map((id) => HINT_BY_COUNTRY.get(id))
-          .filter((h): h is CountryHint => !!h)
-          .map((h) => (
-            <div key={h.id} className="exam-point">
-              <h4>📝 수능 포인트 · {h.answer}</h4>
-              <p className="small">
-                <b>기후</b> {h.climate}
-              </p>
-              <div className="chips">
-                {h.resources.map((r) => (
-                  <span key={r} className="chip static">
-                    {r}
-                  </span>
+        selectedCountryIds.flatMap((id) => {
+          const list = hints.filter((h) => h.countryId === id);
+          if (list.length === 0) return [];
+          const name = countryById.get(id)?.nameKo ?? list[0].answer;
+          return [
+            <div key={id} className="exam-point">
+              <h4>
+                📝 개념 포인트 · {name} <span className="muted small">{list.length}개</span>
+              </h4>
+              <ul>
+                {list.map((h) => (
+                  <li key={h.id}>
+                    <p className="small">
+                      {h.kind === 'city' && <b>[{h.answer}] </b>}
+                      {h.hint}
+                    </p>
+                    {h.climate && (
+                      <p className="small">
+                        <b>기후</b> {h.climate}
+                      </p>
+                    )}
+                    {h.explanation && <p className="small muted">💡 {h.explanation}</p>}
+                  </li>
                 ))}
-              </div>
-              <p className="small">💡 {h.explanation}</p>
-            </div>
-          ))}
+              </ul>
+            </div>,
+          ];
+        })}
 
       {!isCountry && (
         <div>

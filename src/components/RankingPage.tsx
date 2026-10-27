@@ -7,7 +7,7 @@ export default function RankingPage({ initial }: { initial: RankingFilter }) {
     <div className="ranking-page">
       <HallOfFame limit={50} initial={initial} showPeriod />
       <p className="muted small center">
-        타임어택 기록만 순위에 올라가요. 같은 점수면 먼저 세운 기록이 위, 등수는 같아요.
+        타임어택(20문제) 기록만 순위에 올라가요. 같은 점수면 더 빨리 끝낸 기록이 위에 오고, 등수는 같아요.
       </p>
     </div>
   );

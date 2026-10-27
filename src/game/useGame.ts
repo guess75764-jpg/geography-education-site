@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { geoArea, geoDistance } from 'd3-geo';
 import type { City, Country } from '../types';
-import { GEO_HINTS, type GeoHint } from '../data/hints';
-import { CITY_TOLERANCE_KM, FEEDBACK_MS, PRACTICE_COUNT, TIME_LIMIT_SEC, pointsFor } from './scoring';
+import type { GeoHint } from '../data/hints';
+import { CITY_TOLERANCE_KM, FEEDBACK_MS, PRACTICE_COUNT, TIMEATTACK_COUNT, pointsFor } from './scoring';
 
 /** 문제 유형 */
 export type QuizType = 'country' | 'city' | 'mixed' | 'hint';
-/** 플레이 방식: 타임어택(60초, 랭킹 등록) / 연습(10문제, 해설 보며 천천히) */
+/** 플레이 방식: 타임어택(20문제, 랭킹 등록) / 연습(10문제, 해설 보며 천천히) */
 export type PlayStyle = 'timeattack' | 'practice';
 
 export const QUIZ_TYPE_LABEL: Record<QuizType, string> = {
   country: '국가',
   city: '도시',
   mixed: '섞어서',
-  hint: '수능 힌트',
+  hint: '개념+위치',
 };
 
 export type Target = { type: 'country'; countryId: string } | { type: 'point'; lon: number; lat: number };
@@ -23,7 +23,7 @@ export interface Question {
   target: Target;
   answerName: string; // 정답 이름
   label: '국가' | '도시';
-  hint?: GeoHint; // 수능 힌트 문제일 때
+  hint?: GeoHint; // 개념+위치 문제일 때
 }
 
 export interface AnswerResult {
@@ -55,7 +55,19 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export function useGame(countries: Country[], cities: City[]) {
+/** 문제 n개를 만든다. 문제 은행이 n개보다 적으면 섞어서 반복하되, 같은 문제가 연달아 나오지 않게 한다 */
+function buildQueue(pool: Question[], n: number): Question[] {
+  if (pool.length === 0) return [];
+  const out: Question[] = [];
+  while (out.length < n) {
+    let more = shuffle(pool);
+    if (more.length > 1 && out.length && more[0].key === out[out.length - 1].key) more = [...more.slice(1), more[0]];
+    out.push(...more);
+  }
+  return out.slice(0, n);
+}
+
+export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) {
   const [type, setType] = useState<QuizType>('country');
   const [style, setStyle] = useState<PlayStyle>('timeattack');
   const [phase, setPhase] = useState<Phase>('ready');
@@ -64,7 +76,8 @@ export function useGame(countries: Country[], cities: City[]) {
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<AnswerResult[]>([]);
   const [combo, setCombo] = useState(0);
-  const [endsAt, setEndsAt] = useState(0);
+  const [startedAt, setStartedAt] = useState(0);
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const questionStartedAt = useRef(0);
 
@@ -88,14 +101,17 @@ export function useGame(countries: Country[], cities: City[]) {
   );
   const hintQuestions = useMemo<Question[]>(
     () =>
-      GEO_HINTS.map((h) => ({
+      hints.map((h) => ({
         key: `h:${h.id}`,
-        target: h.kind === 'country' ? { type: 'country', countryId: h.countryId } : { type: 'point', lon: h.lon, lat: h.lat },
+        target:
+          h.kind === 'city' && h.lon !== undefined && h.lat !== undefined
+            ? { type: 'point', lon: h.lon, lat: h.lat }
+            : { type: 'country', countryId: h.countryId },
         answerName: h.answer,
         label: h.kind === 'country' ? '국가' : '도시',
         hint: h,
       })),
-    [],
+    [hints],
   );
 
   const poolFor = useCallback(
@@ -111,7 +127,9 @@ export function useGame(countries: Country[], cities: City[]) {
   );
 
   const isTimed = style === 'timeattack';
-  const timeLeftMs = isTimed && (phase === 'playing' || phase === 'answered') ? Math.max(0, endsAt - now) : isTimed && phase !== 'finished' ? TIME_LIMIT_SEC * 1000 : 0;
+  /** 타임어택 경과 시간 (스톱워치) */
+  const elapsedMs =
+    phase === 'playing' || phase === 'answered' || phase === 'finished' ? Math.max(0, (finishedAt ?? now) - startedAt) : 0;
   const current = phase === 'playing' || phase === 'answered' ? queue[index] ?? null : null;
   const lastResult = phase === 'answered' ? results[results.length - 1] ?? null : null;
   const score = results.reduce((s, r) => s + r.points, 0);
@@ -121,16 +139,18 @@ export function useGame(countries: Country[], cities: City[]) {
     (t: QuizType = type, s: PlayStyle = style) => {
       setType(t);
       setStyle(s);
-      const pool = shuffle(poolFor(t));
-      setQueue(s === 'practice' ? pool.slice(0, PRACTICE_COUNT) : pool);
+      setQueue(buildQueue(poolFor(t), s === 'practice' ? PRACTICE_COUNT : TIMEATTACK_COUNT));
       setIndex(0);
       setResults([]);
       setCombo(0);
+      setFinishedAt(null);
       if (s === 'timeattack') {
         setCountdown(COUNTDOWN_FROM);
         setPhase('countdown');
       } else {
-        questionStartedAt.current = Date.now();
+        const t0 = Date.now();
+        setStartedAt(t0);
+        questionStartedAt.current = t0;
         setPhase('playing');
       }
     },
@@ -142,7 +162,7 @@ export function useGame(countries: Country[], cities: City[]) {
     if (phase !== 'countdown') return;
     if (countdown <= 0) {
       const t = Date.now();
-      setEndsAt(t + TIME_LIMIT_SEC * 1000);
+      setStartedAt(t);
       setNow(t);
       questionStartedAt.current = t;
       setPhase('playing');
@@ -152,16 +172,12 @@ export function useGame(countries: Country[], cities: City[]) {
     return () => clearTimeout(id);
   }, [phase, countdown]);
 
-  // 타임어택 시계
+  // 타임어택 스톱워치 화면 갱신
   useEffect(() => {
     if (!isTimed || (phase !== 'playing' && phase !== 'answered')) return;
-    const id = setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      if (t >= endsAt) setPhase('finished');
-    }, 100);
+    const id = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(id);
-  }, [isTimed, phase, endsAt]);
+  }, [isTimed, phase]);
 
   /** 지도 클릭으로 답하기 */
   const submit = useCallback(
@@ -191,24 +207,15 @@ export function useGame(countries: Country[], cities: City[]) {
 
   const next = useCallback(() => {
     if (phase !== 'answered') return;
-    if (!isTimed && index + 1 >= queue.length) {
-      setPhase('finished');
-      return;
-    }
-    if (isTimed && Date.now() >= endsAt) {
-      setPhase('finished');
-      return;
-    }
-    // 타임어택에서 문제를 다 쓰면 다시 섞어 이어 붙인다 (방금 문제가 바로 또 나오지 않게)
     if (index + 1 >= queue.length) {
-      let more = shuffle(poolFor(type));
-      if (more.length > 1 && more[0].key === queue[index]?.key) more = [...more.slice(1), more[0]];
-      setQueue((q) => [...q, ...more]);
+      setFinishedAt(Date.now());
+      setPhase('finished');
+      return;
     }
     setIndex((i) => i + 1);
     questionStartedAt.current = Date.now();
     setPhase('playing');
-  }, [phase, isTimed, index, queue, endsAt, poolFor, type]);
+  }, [phase, index, queue.length]);
 
   // 타임어택은 잠깐 결과를 보여 준 뒤 자동으로 다음 문제
   useEffect(() => {
@@ -218,6 +225,7 @@ export function useGame(countries: Country[], cities: City[]) {
   }, [phase, isTimed, lastResult, next]);
 
   const reset = useCallback(() => {
+    setFinishedAt(null);
     setPhase('ready');
     setResults([]);
     setCombo(0);
@@ -234,11 +242,13 @@ export function useGame(countries: Country[], cities: City[]) {
     lastResult,
     results,
     questionNumber: index + 1,
-    practiceTotal: queue.length,
+    totalQuestions: queue.length,
+    /** 이 유형의 문제 은행 크기 (개념이 0개면 시작할 수 없음) */
+    poolSize: (t: QuizType) => poolFor(t).length,
     score,
     combo,
     maxCombo,
-    timeLeftMs,
+    elapsedMs,
     start,
     submit,
     next,

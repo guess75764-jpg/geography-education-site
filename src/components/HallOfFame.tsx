@@ -62,7 +62,7 @@ export default function HallOfFame({
       <header className="hof-head">
         <div>
           <h2>🏆 명예의 전당</h2>
-          <p className="muted small">타임어택 60초 최고 기록 Top {limit}</p>
+          <p className="muted small">타임어택 20문제 최고 기록 Top {limit} · 같은 점수면 더 빨리 끝낸 순</p>
         </div>
         {scoresEnabled && (
           <button className="ghost-btn" onClick={load} aria-label="새로고침">

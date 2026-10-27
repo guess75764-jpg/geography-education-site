@@ -1,6 +1,7 @@
 import { withRanks, type ScoreRow } from '../lib/scores';
 import { QUIZ_TYPE_LABEL } from '../game/useGame';
 import TierBadge from './TierBadge';
+import { formatDuration } from './GameHud';
 
 const MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -36,6 +37,7 @@ export default function RankingList({
               <TierBadge score={r.score} />
               {showKind && <span className="kind-chip">{QUIZ_TYPE_LABEL[r.quiz_kind] ?? r.quiz_kind}</span>}
               {r.max_combo >= 3 && <span className="combo-chip">🔥{r.max_combo}</span>}
+              {r.duration_ms != null && <span className="time-chip">⏱{formatDuration(r.duration_ms)}</span>}
               <span className="date">{formatDate(r.created_at)}</span>
             </span>
           </span>

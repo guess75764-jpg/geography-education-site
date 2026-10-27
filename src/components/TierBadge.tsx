@@ -13,7 +13,7 @@ export default function TierBadge({ score, size = 'sm' }: { score: number; size?
 /** 다음 칭호까지의 진행 막대 */
 export function TierProgress({ score }: { score: number }) {
   const n = nextTier(score);
-  if (!n) return <p className="tier-next max">최고 칭호 달성! 진정한 세계시민 🌏</p>;
+  if (!n) return <p className="tier-next max">최고 칭호 달성! 당신은 진정한 지리박사 🎓</p>;
   return (
     <div className="tier-next">
       <div className="tier-bar">

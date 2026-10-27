@@ -41,12 +41,24 @@ function Item({ it }: { it: ReviewItem }) {
             </span>
           )}
         </p>
-        {h && (
+        {h && (h.explanation || h.climate || h.resources.length > 0) && (
           <div className="review-explain small">
-            <p>💡 {h.explanation}</p>
-            <p>
-              <b>기후</b> {h.climate} · <b>자원</b> {h.resources.join(', ')}
-            </p>
+            {h.explanation && <p>💡 {h.explanation}</p>}
+            {(h.climate || h.resources.length > 0) && (
+              <p>
+                {h.climate && (
+                  <>
+                    <b>기후</b> {h.climate}
+                  </>
+                )}
+                {h.climate && h.resources.length > 0 && ' · '}
+                {h.resources.length > 0 && (
+                  <>
+                    <b>자원</b> {h.resources.join(', ')}
+                  </>
+                )}
+              </p>
+            )}
           </div>
         )}
       </div>
