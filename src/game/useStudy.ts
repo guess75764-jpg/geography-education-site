@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { geoDistance } from 'd3-geo';
 import type { GeoHint } from '../data/hints';
 import { CITY_TOLERANCE_KM } from './scoring';
+import { answerCountryIds } from '../lib/concepts';
 
 export type StudyStatus = 'asking' | 'wrong' | 'correct' | 'revealed';
 
@@ -70,7 +71,7 @@ export function useStudy(hints: GeoHint[]) {
           ok = distanceKm <= CITY_TOLERANCE_KM;
         }
       } else {
-        ok = countryId === current.countryId;
+        ok = !!countryId && answerCountryIds(current).includes(countryId); // 복수 정답 중 하나면 정답
       }
       setLastClick({ countryId, lonLat, distanceKm });
       setTries((t) => t + 1);

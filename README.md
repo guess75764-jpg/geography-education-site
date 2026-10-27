@@ -40,6 +40,8 @@
 - 문장 속 정답 이름은 “이 나라 / 이 도시”로 가림, 여러 나라가 나오면 ‘확인 필요’로 표시, 이미 등록된 개념은 자동 제외
 - 스캔·그림 PDF는 글자가 없어 읽을 수 없음 → 한글·워드에서 ‘PDF로 저장’한 파일을 쓰거나 글을 복사해 ‘글 붙여 넣기’ 이용
 출제 중인 개념이 도전 문제 수(10·20·40·60)보다 많으면 한 판에 중복 없이 나옵니다. (관리 화면에 단계별로 표시)
+**정답이 여러 나라인 개념**: 예) 탱고 → 아르헨티나 또는 우루과이. 개념 추가 화면의 ‘함께 정답으로 인정할 나라’에 넣거나,
+여러 개 추가·PDF에서 `개념 | 아르헨티나, 우루과이` (또는 `/`, `또는`)로 쓰면 둘 중 하나만 골라도 정답입니다.
 `src/data/hints.ts` 의 기본 개념은 인터넷이 없을 때만 쓰는 예비 문제입니다.
 
 ## 실행
@@ -73,6 +75,7 @@ npm run build:html  # HTML 파일 하나로 묶기 → dist-single/index.html
    - `supabase/migrations/002_admin_and_concepts.sql` (관리자·개념 표 + 시작용 개념 24개)
    - `supabase/migrations/003_challenges_and_my_records.sql` (도전 단계 + 내 기록 갱신)
    - `supabase/migrations/004_scoring_update.sql` (새 점수 규칙에 맞춘 최대 점수 검사)
+   - `supabase/migrations/005_multiple_answers.sql` (한 개념에 정답 나라 여러 개 + 탱고 예시)
 2. **관리자 계정** — Authentication → Users → Add user → Create new user (이메일·비밀번호, **Auto Confirm User** 체크) 후 SQL Editor 에서
    `insert into public.admins (user_id) select id from auth.users where email = '선생님이메일';`
    - 권장: Authentication → Sign In / Providers 에서 **Allow new users to sign up** 끄기 (관리자 외 가입 차단)

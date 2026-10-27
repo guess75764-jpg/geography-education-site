@@ -14,6 +14,7 @@ import { useGame } from './game/useGame';
 import { useStudy } from './game/useStudy';
 import StudyPanel from './components/StudyPanel';
 import type { ChallengeCount } from './game/scoring';
+import { answerCountryIds } from './lib/concepts';
 import { comboMultiplier } from './game/scoring';
 import { fireComboLevelUp, fireCorrect } from './game/fx';
 import { CITIES } from './data/cities';
@@ -213,7 +214,7 @@ export default function App() {
       }
       if (done) {
         if (isPoint) markers.push({ id: 'answer', lon: h.lon!, lat: h.lat!, tone: 'correct', label: h.answer });
-        else highlights[h.countryId] = 'correct';
+        else for (const id of answerCountryIds(h)) highlights[id] = 'correct'; // 복수 정답이면 모두 초록
       }
     }
     return { highlights, markers };
@@ -226,7 +227,7 @@ export default function App() {
       setStudyFocus(
         h.kind === 'city' && h.lon !== undefined && h.lat !== undefined
           ? { countryIds: [], points: [[h.lon, h.lat]] }
-          : { countryIds: [h.countryId], points: [] },
+          : { countryIds: answerCountryIds(h), points: [] },
       );
     } else if (study.status === 'asking') {
       setStudyFocus(WORLD);
@@ -241,7 +242,7 @@ export default function App() {
     const a = game.lastResult;
     if (q && a) {
       if (q.target.type === 'country') {
-        highlights[q.target.countryId] = 'correct';
+        for (const id of [q.target.countryId, ...(q.target.altIds ?? [])]) highlights[id] = 'correct';
         if (!a.correct && a.clickedCountryId) highlights[a.clickedCountryId] = 'wrong';
       } else {
         markers.push({ id: 'answer', lon: q.target.lon, lat: q.target.lat, tone: 'correct', label: q.answerName });

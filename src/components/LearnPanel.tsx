@@ -177,7 +177,7 @@ export default function LearnPanel({
       {/* 개념 포인트: 선택한 나라와 관련된 개념(관리자 등록) */}
       {isCountry &&
         selectedCountryIds.flatMap((id) => {
-          const list = hints.filter((h) => h.countryId === id);
+          const list = hints.filter((h) => h.countryId === id || (h.altCountryIds ?? []).includes(id));
           if (list.length === 0) return [];
           const name = countryById.get(id)?.nameKo ?? list[0].answer;
           return [

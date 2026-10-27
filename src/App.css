@@ -541,3 +541,5 @@ button.link.danger { color: var(--wrong); }
 .cands, .tag-pick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .cands .chip, .tag-pick .chip { font-size: 0.75rem; padding: 2px 8px; }
 .source { margin: 0; word-break: keep-all; }
+.alt-chip { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; border-color: #93c5fd; color: #1e40af; font-weight: 700; font-size: 0.85rem; }
+.alt-chip button { border: 0; background: none; color: inherit; padding: 0 2px; font-size: 1rem; line-height: 1; }

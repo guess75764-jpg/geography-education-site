@@ -8,6 +8,8 @@ export interface GeoHint {
   kind: 'country' | 'city';
   /** 정답 나라 (world-atlas 의 ISO 숫자 코드, 예: 브라질 '076') */
   countryId: string;
+  /** 함께 정답으로 인정하는 나라들 (예: 탱고 → 아르헨티나 + 우루과이 '858') */
+  altCountryIds?: string[];
   /** 도시 정답일 때 좌표 */
   lon?: number;
   lat?: number;

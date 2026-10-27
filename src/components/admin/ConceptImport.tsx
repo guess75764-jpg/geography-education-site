@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { buildPlaces, importFromText, maskAnswer, type ImportItem, type Place } from '../../lib/conceptImport';
+import { buildPlaces, importFromText, maskAll, resolveMany, type ImportItem, type Place } from '../../lib/conceptImport';
 import { extractPdfLines } from '../../lib/pdfText';
 import { createConcepts, type ConceptInput, type ConceptRow } from '../../lib/concepts';
 import { describeDbError } from '../../lib/scores';
@@ -53,7 +53,8 @@ export default function ConceptImport({
   const toRows = (items: ImportItem[]): Row[] =>
     items.map((it, i) => {
       const duplicate = existingPrompts.has(norm(it.prompt));
-      return { ...it, key: i, promptEdited: false, answerText: it.answer?.name ?? '', duplicate, include: !!it.answer && !duplicate && it.status !== 'none' };
+      const answerText = it.answer ? [it.answer, ...it.alts].map((p) => p.name).join(', ') : '';
+      return { ...it, key: i, promptEdited: false, answerText, duplicate, include: !!it.answer && !duplicate && it.status !== 'none' };
     });
 
   const readFile = async (file: File) => {
@@ -95,14 +96,16 @@ export default function ConceptImport({
 
   const update = (key: number, patch: Partial<Row>) => setRows((rs) => rs?.map((r) => (r.key === key ? { ...r, ...patch } : r)) ?? null);
 
-  /** 정답 칸을 고치면 나라·도시를 다시 찾고, 문장 속에 새 정답 이름이 있으면 가린다 */
+  /** 정답 칸을 고치면 나라·도시를 다시 찾고(쉼표로 여러 나라), 문장 속에 정답 이름이 있으면 가린다 */
   const changeAnswer = (r: Row, text: string) => {
-    const p = lookup.get(text.trim()) ?? lookup.get(text.trim().toLowerCase()) ?? null;
+    const many = resolveMany(text, lookup);
+    const p = many?.[0] ?? null;
     update(r.key, {
       answerText: text,
       answer: p,
+      alts: many?.slice(1) ?? [],
       // 직접 고친 문장이 아니면 원래 문장에서 새 정답 이름만 다시 가린다
-      prompt: p ? maskAnswer(r.promptEdited ? r.prompt : r.base, p, lookup) : r.promptEdited ? r.prompt : r.base,
+      prompt: many ? maskAll(r.promptEdited ? r.prompt : r.base, many, lookup) : r.promptEdited ? r.prompt : r.base,
       status: p ? 'auto' : 'none',
       reason: p ? '직접 고름' : '정답 없음',
       include: p ? true : r.include,
@@ -127,6 +130,7 @@ export default function ConceptImport({
         prompt: r.prompt.trim(),
         answer_type: r.answer!.kind,
         country_id: r.answer!.countryId,
+        alt_country_ids: r.answer!.kind === 'country' ? r.alts.filter((a) => a.kind === 'country').map((a) => a.countryId) : [],
         answer_name: r.answer!.name,
         lon: r.answer!.kind === 'city' ? r.answer!.lon ?? null : null,
         lat: r.answer!.kind === 'city' ? r.answer!.lat ?? null : null,
@@ -237,19 +241,30 @@ export default function ConceptImport({
                   <div className="import-meta">
                     <label className="answer-edit">
                       정답
-                      <input list="place-names" value={r.answerText} placeholder="나라·도시 이름" onChange={(e) => changeAnswer(r, e.target.value)} />
+                      <input list="place-names" value={r.answerText} placeholder="나라·도시 (여럿이면 쉼표)" onChange={(e) => changeAnswer(r, e.target.value)} />
                       {r.answer && <span className="small">{r.answer.kind === 'city' ? '📍 도시' : '🗺️ 나라'}</span>}
                     </label>
                     <span className={`st st-${r.duplicate ? 'dup' : r.status}`} title={r.reason}>
                       {r.duplicate ? '이미 등록됨' : STATUS_LABEL[r.status]}
                     </span>
-                    {r.status === 'check' && r.candidates.length > 1 && (
-                      <span className="cands">
-                        {r.candidates.map((c) => (
-                          <button type="button" key={c.name} className={`chip ${r.answer === c ? 'on' : ''}`} onClick={() => changeAnswer(r, c.name)}>
-                            {c.name}
-                          </button>
-                        ))}
+                    {r.candidates.length > 1 && (
+                      <span className="cands" title="눌러서 정답에 넣거나 빼기 (여러 개 고르면 모두 정답)">
+                        {r.candidates.map((c) => {
+                          const picked = [r.answer, ...r.alts].filter(Boolean) as Place[];
+                          const on = picked.includes(c);
+                          const next = on ? picked.filter((x) => x !== c) : [...picked, c];
+                          return (
+                            <button
+                              type="button"
+                              key={c.name}
+                              className={`chip ${on ? 'on' : ''}`}
+                              onClick={() => changeAnswer(r, next.map((x) => x.name).join(', '))}
+                            >
+                              {on ? '✓ ' : '+ '}
+                              {c.name}
+                            </button>
+                          );
+                        })}
                       </span>
                     )}
                     <span className="tag-pick">

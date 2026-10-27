@@ -21,6 +21,8 @@ interface FormState {
   prompt: string;
   answerType: 'country' | 'city';
   countryId: string;
+  altIds: string[]; // 함께 정답으로 인정할 나라들
+  altColumn: boolean; // 수정 중인 개념에 복수 정답 칸이 있는지 (SQL 005 실행 여부)
   cityName: string;
   lon: number | null;
   lat: number | null;
@@ -35,6 +37,8 @@ const EMPTY: FormState = {
   prompt: '',
   answerType: 'country',
   countryId: '',
+  altIds: [],
+  altColumn: false,
   cityName: '',
   lon: null,
   lat: null,
@@ -108,6 +112,20 @@ export default function AdminConcepts({
     return realCountries.filter((c) => norm(c.nameKo).includes(q) || norm(c.nameEn).includes(q)).slice(0, 6);
   }, [countryQuery, realCountries]);
 
+  // 함께 정답으로 인정할 나라 검색
+  const [altQuery, setAltQuery] = useState('');
+  const altHits = useMemo(() => {
+    const q = norm(altQuery);
+    if (!q) return [];
+    return realCountries
+      .filter((c) => c.id !== form.countryId && !form.altIds.includes(c.id) && (norm(c.nameKo).includes(q) || norm(c.nameEn).includes(q)))
+      .slice(0, 6);
+  }, [altQuery, realCountries, form.countryId, form.altIds]);
+  const addAlt = (c: Country) => {
+    setForm((f) => ({ ...f, altIds: [...f.altIds, c.id] }));
+    setAltQuery('');
+  };
+
   const pickCountry = (c: Country) => {
     set('countryId', c.id);
     setCountryQuery('');
@@ -147,6 +165,7 @@ export default function AdminConcepts({
     prompt: f.prompt,
     answer_type: f.answerType,
     country_id: f.countryId,
+    alt_country_ids: f.answerType === 'country' ? f.altIds.filter((id) => id !== f.countryId) : [],
     answer_name: f.answerType === 'city' ? f.cityName : countryById.get(f.countryId)?.nameKo ?? '',
     lon: f.answerType === 'city' ? f.lon : null,
     lat: f.answerType === 'city' ? f.lat : null,
@@ -167,7 +186,7 @@ export default function AdminConcepts({
     try {
       if (form.editingId !== null) {
         const { is_active: _keep, ...changes } = toInput(form);
-        await updateConcept(form.editingId, changes);
+        await updateConcept(form.editingId, changes, form.altColumn);
         await afterChange('개념을 수정했어요.');
       } else {
         await createConcepts([toInput(form)]);
@@ -187,6 +206,8 @@ export default function AdminConcepts({
       prompt: r.prompt,
       answerType: r.answer_type,
       countryId: r.country_id,
+      altIds: r.alt_country_ids ?? [],
+      altColumn: Array.isArray(r.alt_country_ids),
       cityName: r.answer_type === 'city' ? r.answer_name : '',
       lon: r.lon,
       lat: r.lat,
@@ -195,7 +216,11 @@ export default function AdminConcepts({
       resources: (r.resources ?? []).join(', '),
       tags: r.tags ?? [],
     });
-    setFocus(r.answer_type === 'city' && r.lon !== null && r.lat !== null ? { countryIds: [], points: [[r.lon, r.lat]] } : { countryIds: [r.country_id], points: [] });
+    setFocus(
+      r.answer_type === 'city' && r.lon !== null && r.lat !== null
+        ? { countryIds: [], points: [[r.lon, r.lat]] }
+        : { countryIds: [r.country_id, ...(r.alt_country_ids ?? [])], points: [] },
+    );
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
@@ -220,9 +245,17 @@ export default function AdminConcepts({
             label: `📍 ${city.nameKo}`,
           };
         }
-        const country = countryByName.get(norm(answer));
-        if (!country) return { line, error: `"${answer}" 을(를) 나라·도시 목록에서 찾지 못했어요` };
-        return { line, input: toInput({ ...EMPTY, prompt, countryId: country.id }), label: `🗺️ ${country.nameKo}` };
+        // 정답 나라가 여러 개일 수 있음: "아르헨티나, 우루과이", "아르헨티나/우루과이", "아르헨티나 또는 우루과이"
+        const names = answer.split(/\s*(?:,|，|\/|·|또는|혹은)\s*/).filter(Boolean);
+        const found = names.map((n) => countryByName.get(norm(n)));
+        const missing = names.filter((_, k) => !found[k]);
+        if (missing.length) return { line, error: `"${missing.join(', ')}" 을(를) 나라·도시 목록에서 찾지 못했어요` };
+        const [main, ...alts] = found as Country[];
+        return {
+          line,
+          input: toInput({ ...EMPTY, prompt, countryId: main.id, altIds: alts.map((c) => c.id) }),
+          label: `🗺️ ${[main, ...alts].map((c) => c.nameKo).join(' · ')}`,
+        };
       });
     // toInput 은 countryById 에만 의존
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,7 +304,15 @@ export default function AdminConcepts({
   }, [rows, filter]);
   const activeCount = rows?.filter((r) => r.is_active).length ?? 0;
 
-  const mapFills = useMemo(() => (form.countryId ? { [form.countryId]: '#2563eb' } : {}), [form.countryId]);
+  // 지도: 주 정답은 진한 파랑, 함께 인정하는 정답은 연한 파랑
+  const mapFills = useMemo(() => {
+    const fills: Record<string, string> = {};
+    if (form.answerType === 'country') for (const id of form.altIds) fills[id] = '#93c5fd';
+    if (form.countryId) fills[form.countryId] = '#2563eb';
+    return fills;
+  }, [form.countryId, form.altIds, form.answerType]);
+  const answerLabel = (r: ConceptRow) =>
+    [r.answer_name, ...(r.answer_type === 'country' ? r.alt_country_ids ?? [] : []).map((id) => countryById.get(id)?.nameKo ?? id)].join(' · ');
   const mapMarkers = useMemo<MapMarker[]>(
     () =>
       form.answerType === 'city' && form.lon !== null && form.lat !== null
@@ -366,7 +407,52 @@ export default function AdminConcepts({
                   )}
                 </div>
               </div>
-            ) : (
+            ) : null}
+
+            {form.answerType === 'country' && (
+              <div className="field">
+                함께 정답으로 인정할 나라 <span className="muted small">(선택 · 둘 중 하나만 골라도 정답, 예: 탱고 → 아르헨티나 + 우루과이)</span>
+                {form.altIds.length > 0 && (
+                  <div className="chips">
+                    {form.altIds.map((id) => (
+                      <span key={id} className="chip alt-chip">
+                        {countryById.get(id)?.nameKo ?? id}
+                        <button type="button" aria-label="빼기" onClick={() => set('altIds', form.altIds.filter((x) => x !== id))}>
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="search">
+                  <input
+                    type="search"
+                    placeholder="나라 이름 검색해서 추가"
+                    value={altQuery}
+                    onChange={(e) => setAltQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && altHits[0]) {
+                        e.preventDefault();
+                        addAlt(altHits[0]);
+                      }
+                    }}
+                  />
+                  {altHits.length > 0 && (
+                    <ul className="search-results">
+                      {altHits.map((c) => (
+                        <li key={c.id}>
+                          <button type="button" onClick={() => addAlt(c)}>
+                            {c.nameKo} <span className="muted">{c.nameEn}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {form.answerType === 'city' && (
               <div className="field">
                 정답 도시
                 <input
@@ -439,11 +525,11 @@ export default function AdminConcepts({
       <details className="card admin-section bulk">
         <summary>📋 여러 개 한꺼번에 추가하기</summary>
         <p className="muted small">
-          한 줄에 하나씩 <b>개념 | 정답</b> 형식으로 붙여 넣으세요. 정답은 나라 이름(한국어·영어) 또는 도시 목록에 있는 도시 이름이에요.
+          한 줄에 하나씩 <b>개념 | 정답</b> 형식으로 붙여 넣으세요. 정답은 나라 이름(한국어·영어) 또는 도시 목록에 있는 도시 이름이에요. 정답 나라가 여럿이면 쉼표로 이어 쓰세요 (예: 아르헨티나, 우루과이).
         </p>
         <textarea
           rows={6}
-          placeholder={'쌈바 축제로 유명한 남아메리카 국가는? | 브라질\n탱고의 발상지로 알려진 남아메리카 국가는? | 아르헨티나\n센강이 흐르고 에펠탑이 있는 도시는? | 파리'}
+          placeholder={'쌈바 축제로 유명한 남아메리카 국가는? | 브라질\n탱고로 유명한 라틴 아메리카 국가는? | 아르헨티나, 우루과이\n센강이 흐르고 에펠탑이 있는 도시는? | 파리'}
           value={bulk}
           onChange={(e) => setBulk(e.target.value)}
         />
@@ -482,7 +568,7 @@ export default function AdminConcepts({
                   <span className="concept-prompt">{r.prompt}</span>
                   <span className="sub">
                     <span className="answer-chip">
-                      {r.answer_type === 'city' ? '📍' : '🗺️'} {r.answer_name}
+                      {r.answer_type === 'city' ? '📍' : '🗺️'} {answerLabel(r)}
                     </span>
                     {r.tags?.map((t) => (
                       <span key={t} className="kind-chip">

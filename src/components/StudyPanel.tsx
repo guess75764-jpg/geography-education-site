@@ -20,6 +20,12 @@ export default function StudyPanel({
   const done = status === 'correct' || status === 'revealed';
   const clickedName = lastClick?.countryId ? countryById.get(lastClick.countryId)?.nameKo : null;
   const isCity = current.kind === 'city';
+  // 복수 정답: "아르헨티나 또는 우루과이"
+  const answerNames = [current.answer, ...(current.altCountryIds ?? []).map((id) => countryById.get(id)?.nameKo ?? id)];
+  const otherAnswers =
+    status === 'correct' && lastClick?.countryId
+      ? answerNames.filter((n) => n !== countryById.get(lastClick.countryId!)?.nameKo)
+      : [];
 
   return (
     <div className="study">
@@ -74,8 +80,10 @@ export default function StudyPanel({
       {done && (
         <div className={`feedback ${status === 'correct' ? 'ok' : 'reveal'}`}>
           <strong className="feedback-title">
-            {status === 'correct' ? (study.tries === 1 ? '⭕ 정답! 한 번에 맞혔어요' : '⭕ 정답!') : '👀 정답 공개'} — {current.answer}
+            {status === 'correct' ? (study.tries === 1 ? '⭕ 정답! 한 번에 맞혔어요' : '⭕ 정답!') : '👀 정답 공개'} —{' '}
+            {answerNames.join(' 또는 ')}
           </strong>
+          {answerNames.length > 1 && otherAnswers.length > 0 && <p className="small">{otherAnswers.join(', ')}도 정답이에요.</p>}
           {(current.explanation || current.climate || current.resources.length > 0) && (
             <div className="explain">
               {current.explanation && <p>💡 {current.explanation}</p>}

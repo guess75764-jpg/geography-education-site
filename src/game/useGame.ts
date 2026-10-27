@@ -16,7 +16,12 @@ export const QUIZ_TYPE_LABEL: Record<QuizType, string> = {
   hint: '개념+위치',
 };
 
-export type Target = { type: 'country'; countryId: string } | { type: 'point'; lon: number; lat: number };
+/** 나라 정답은 여러 개일 수 있다 (altIds 중 하나를 골라도 정답) */
+export type Target = { type: 'country'; countryId: string; altIds?: string[] } | { type: 'point'; lon: number; lat: number };
+
+/** 이 나라를 고르면 정답인지 */
+export const isTargetCountry = (t: Target, id: string | null) =>
+  !!id && t.type === 'country' && (t.countryId === id || (t.altIds ?? []).includes(id));
 
 export interface Question {
   key: string;
@@ -100,6 +105,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
       })),
     [cities],
   );
+  const nameOf = useMemo(() => new Map(countries.map((c) => [c.id, c.nameKo])), [countries]);
   const hintQuestions = useMemo<Question[]>(
     () =>
       hints.map((h) => ({
@@ -107,12 +113,16 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
         target:
           h.kind === 'city' && h.lon !== undefined && h.lat !== undefined
             ? { type: 'point', lon: h.lon, lat: h.lat }
-            : { type: 'country', countryId: h.countryId },
-        answerName: h.answer,
+            : { type: 'country', countryId: h.countryId, altIds: h.altCountryIds ?? [] },
+        // 복수 정답이면 "아르헨티나 또는 우루과이"
+        answerName:
+          h.kind === 'country' && h.altCountryIds?.length
+            ? [h.answer, ...h.altCountryIds.map((id) => nameOf.get(id) ?? id)].join(' 또는 ')
+            : h.answer,
         label: h.kind === 'country' ? '국가' : '도시',
         hint: h,
       })),
-    [hints],
+    [hints, nameOf],
   );
 
   const poolFor = useCallback(
@@ -208,7 +218,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
       let correct = false;
       let distanceKm: number | null = null;
       if (current.target.type === 'country') {
-        correct = clickedCountryId === current.target.countryId;
+        correct = isTargetCountry(current.target, clickedCountryId);
       } else if (clickedLonLat) {
         const { lon, lat } = current.target;
         distanceKm = Math.round(geoDistance(clickedLonLat, [lon, lat]) * EARTH_RADIUS_KM);

@@ -16,6 +16,7 @@ export interface ImportItem {
   prompt: string; // 문제로 쓸 문장 (정답 이름은 가림)
   base: string; // 이름을 가리기 전 문장 (정답을 바꾸면 이걸로 다시 가림)
   answer: Place | null;
+  alts: Place[]; // 함께 정답으로 인정할 나라 (예: 아르헨티나 + 우루과이)
   candidates: Place[]; // 글에 나온 나라·도시들
   status: ImportStatus; // auto: 자동 인식 · check: 확인 필요 · none: 정답 못 찾음
   reason: string;
@@ -159,10 +160,28 @@ export function maskAnswer(text: string, place: Place, lookup: Map<string, Place
   return out.replace(/\s{2,}/g, ' ').trim();
 }
 
-function resolve(text: string, lookup: Map<string, Place>): Place | null {
+/** 정답 이름을 모두 가린다 */
+export function maskAll(text: string, places: Place[], lookup: Map<string, Place>): string {
+  return places.reduce((t, p) => maskAnswer(t, p, lookup), text);
+}
+
+function resolveOne(text: string, lookup: Map<string, Place>): Place | null {
   const t = cleanAnswerText(text);
   return lookup.get(t) ?? lookup.get(t.replace(/\s+/g, '')) ?? lookup.get(t.toLowerCase()) ?? null;
 }
+
+/** "아르헨티나, 우루과이" · "아르헨티나/우루과이" · "아르헨티나 또는 우루과이" → [아르헨티나, 우루과이] (모두 찾아야 인정) */
+export function resolveMany(text: string, lookup: Map<string, Place>): Place[] | null {
+  const parts = text.split(/\s*(?:,|，|\/|·|또는|혹은)\s*/).filter((x) => x.trim());
+  if (parts.length === 0) return null;
+  const found = parts.map((x) => resolveOne(x, lookup));
+  if (found.some((x) => !x)) return null;
+  const uniq = [...new Set(found as Place[])];
+  // 도시가 섞여 있으면 첫 정답만 (복수 정답은 나라끼리만)
+  return uniq.length > 1 && uniq.some((x) => x.kind === 'city') ? [uniq[0]] : uniq;
+}
+
+const resolve = (text: string, lookup: Map<string, Place>): Place | null => resolveMany(text, lookup)?.[0] ?? null;
 
 /** 한 항목 → 개념 문항 */
 export function classify(source: string, lookup: Map<string, Place>): ImportItem {
@@ -174,30 +193,36 @@ export function classify(source: string, lookup: Map<string, Place>): ImportItem
   // 1) 정답이 따로 적혀 있는 경우: "… 정답: 브라질", "… - 브라질", "브라질: …", "… (브라질)"
   const label = text.match(ANSWER_LABEL);
   if (label) {
-    const p = resolve(label[1], lookup);
-    if (p) {
+    const many = resolveMany(label[1], lookup);
+    if (many) {
+      const [p, ...alts] = many;
       const rest = text.replace(ANSWER_LABEL, '').replace(/[\s,(]+$/, '').trim();
-      return { source, base: rest, prompt: maskAnswer(rest, p, lookup), answer: p, candidates, status: 'auto', reason: '‘정답’ 표시', tags };
+      return { source, base: rest, prompt: maskAll(rest, many, lookup), answer: p, alts, candidates, status: 'auto', reason: '‘정답’ 표시', tags };
     }
   }
   const paren = text.match(/^(.*\S)\s*[(（]([^()（）]+)[)）]\s*[.。]?$/);
   if (paren) {
-    const p = resolve(paren[2], lookup);
-    if (p) return { source, base: paren[1], prompt: maskAnswer(paren[1], p, lookup), answer: p, candidates, status: 'auto', reason: '괄호 속 정답', tags };
+    const many = resolveMany(paren[2], lookup);
+    if (many) {
+      const [p, ...alts] = many;
+      return { source, base: paren[1], prompt: maskAll(paren[1], many, lookup), answer: p, alts, candidates, status: 'auto', reason: '괄호 속 정답', tags };
+    }
   }
   const tail = text.match(SEP_TAIL);
   if (tail) {
-    const p = resolve(tail[1], lookup);
-    if (p) {
+    const many = resolveMany(tail[1], lookup);
+    if (many) {
+      const [p, ...alts] = many;
       const rest = text.slice(0, text.length - tail[0].length).trim();
-      if (rest.length >= 2) return { source, base: rest, prompt: maskAnswer(rest, p, lookup), answer: p, candidates, status: 'auto', reason: '끝에 적힌 정답', tags };
+      if (rest.length >= 2) return { source, base: rest, prompt: maskAll(rest, many, lookup), answer: p, alts, candidates, status: 'auto', reason: '끝에 적힌 정답', tags };
     }
   }
   const head = text.match(SEP_HEAD);
   if (head) {
-    const p = resolve(head[1], lookup);
-    if (p && head[2].trim().length >= 2) {
-      return { source, base: head[2].trim(), prompt: maskAnswer(head[2].trim(), p, lookup), answer: p, candidates, status: 'auto', reason: '앞에 적힌 정답', tags };
+    const many = resolveMany(head[1], lookup);
+    if (many && head[2].trim().length >= 2) {
+      const [p, ...alts] = many;
+      return { source, base: head[2].trim(), prompt: maskAll(head[2].trim(), many, lookup), answer: p, alts, candidates, status: 'auto', reason: '앞에 적힌 정답', tags };
     }
   }
 
@@ -208,7 +233,7 @@ export function classify(source: string, lookup: Map<string, Place>): ImportItem
     if (p && last[1].length >= 6) {
       let rest = last[1].trim();
       if (/[은는]$/.test(rest)) rest += '?'; // "… 나라는" → "… 나라는?"
-      return { source, base: rest, prompt: maskAnswer(rest, p, lookup), answer: p, candidates, status: 'auto', reason: '끝에 적힌 정답', tags };
+      return { source, base: rest, prompt: maskAnswer(rest, p, lookup), answer: p, alts: [], candidates, status: 'auto', reason: '끝에 적힌 정답', tags };
     }
   }
 
@@ -216,16 +241,16 @@ export function classify(source: string, lookup: Map<string, Place>): ImportItem
   if (all.length && all[0].index === 0 && /\s/.test(text[all[0].length] ?? '')) {
     const p = all[0].place;
     const rest = text.slice(all[0].length).trim();
-    if (rest.length >= 6) return { source, base: rest, prompt: maskAnswer(rest, p, lookup), answer: p, candidates, status: 'auto', reason: '앞에 적힌 정답', tags };
+    if (rest.length >= 6) return { source, base: rest, prompt: maskAnswer(rest, p, lookup), answer: p, alts: [], candidates, status: 'auto', reason: '앞에 적힌 정답', tags };
   }
 
   // 2) 문장 안에 나온 나라·도시로 추측
   if (candidates.length === 0) {
-    return { source, base: text, prompt: text, answer: null, candidates, status: 'none', reason: '나라·도시 이름이 없음', tags };
+    return { source, base: text, prompt: text, answer: null, alts: [], candidates, status: 'none', reason: '나라·도시 이름이 없음', tags };
   }
   if (candidates.length === 1) {
     const p = candidates[0];
-    return { source, base: text, prompt: maskAnswer(text, p, lookup), answer: p, candidates, status: 'auto', reason: '문장 속 이름', tags };
+    return { source, base: text, prompt: maskAnswer(text, p, lookup), answer: p, alts: [], candidates, status: 'auto', reason: '문장 속 이름', tags };
   }
   // 여러 곳이 나오면: '도시·수도'를 묻는 문장이면 도시, 아니면 주어(맨 앞)로 나온 곳을 고르고 확인 요청
   const asksCity = /도시|수도/.test(text);
@@ -235,6 +260,7 @@ export function classify(source: string, lookup: Map<string, Place>): ImportItem
     base: text,
     prompt: maskAnswer(text, pick, lookup),
     answer: pick,
+    alts: [],
     candidates,
     status: 'check',
     reason: `여러 곳이 나옴 (${candidates.map((c) => c.name).join(', ')})`,
@@ -266,7 +292,7 @@ export function splitItems(lines: string[], lookup: Map<string, Place>): string[
       .replace(/^이\s*(?:나라|도시|국가)(?:는|은|가|의 이름은)\s*/, '')
       .replace(/(?:이다|입니다|이에요|예요|다)?[.。!]?$/, '');
     if (cur && line.length <= 30 && resolve(answerOnly, lookup)) {
-      cur += ' 정답: ' + cleanAnswerText(answerOnly);
+      cur += ' 정답: ' + answerOnly.trim();
       flush();
       continue;
     }
