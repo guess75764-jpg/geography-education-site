@@ -34,6 +34,18 @@ npm run build:html  # HTML 파일 하나로 묶기 → dist-single/index.html
 `build:html` 로 만든 파일은 지도·캐릭터 이미지까지 모두 들어 있어, 인터넷 없이 더블클릭만으로 실행됩니다
 (점수 저장·랭킹만 인터넷이 필요). 학교 컴퓨터에 복사하거나 메신저로 나눠 주기 좋습니다.
 
+## Vercel 배포
+
+1. https://vercel.com/new 에서 GitHub 저장소 `geography-education-site` 를 **Import**
+2. 설정은 자동 인식(Vite)되며 `vercel.json` 에도 적어 두었음 — 그대로 두면 됨
+3. **Environment Variables** 에 두 개 추가 (점수 저장·명예의 전당용)
+   - `VITE_SUPABASE_URL` = 프로젝트 URL
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = 공개용 키 (`sb_publishable_…`)
+   - ⚠️ 비밀 키(`sb_secret_…`)는 절대 넣지 말 것 (빌드가 에러로 멈춤)
+4. **Deploy** → `https://<프로젝트이름>.vercel.app` 주소가 생김
+5. 이후 `main` 브랜치에 올라가는 수정은 자동으로 다시 배포됨
+   (환경 변수를 나중에 바꿨다면 Deployments → Redeploy 해야 반영)
+
 ## 점수 저장 (Supabase) 설정
 
 1. **표 만들기** — Supabase 대시보드 → SQL Editor 에 `supabase/migrations/001_create_scores.sql` 내용을 붙여넣고 Run. (여러 번 실행해도 안전, 예전 버전 테이블은 자동 업그레이드)
