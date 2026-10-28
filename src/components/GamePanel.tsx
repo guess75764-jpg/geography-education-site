@@ -10,6 +10,7 @@ import {
   challengeOf,
   comboMultiplier,
   formatLimit,
+  mapStyleLabel,
   isCleared,
   prerequisiteOf,
   speedBonus,
@@ -90,7 +91,7 @@ export default function GamePanel({ game, countryById, onOpenRanking, conceptSou
                       <span className="challenge-emoji">{open ? c.tier.emoji : '🔒'}</span>
                       <strong>{c.title}</strong>
                       <span className="small">
-                        {open ? `${c.count}문제 · ${formatLimit(c.limitSec)}` : `${pre?.title.replace(' 도전', '')} ${pre?.count}문제 모두 정답 시 열림`}
+                        {open ? `${c.count}문제 · ${formatLimit(c.limitSec)} · ${mapStyleLabel(c)}` : `${pre?.title.replace(' 도전', '')} ${pre?.count}문제 모두 정답 시 열림`}
                       </span>
                     </button>
                   );

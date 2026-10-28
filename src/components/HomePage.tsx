@@ -54,6 +54,7 @@ export default function HomePage({
                 <span className="muted small">
                   {c.count}문제 · 제한 시간 {formatLimit(c.limitSec)}
                 </span>
+                <span className={`map-style ${c.countryNames ? 'named' : 'blank'}`}>{c.countryNames ? '🏷️ 나라 이름 표시' : '⬜ 백지도'}</span>
               </button>
             ))}
           </div>

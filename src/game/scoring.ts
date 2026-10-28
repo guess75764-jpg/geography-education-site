@@ -69,14 +69,16 @@ export interface Challenge {
   timeBonusPerSec: number; // 모두 풀었을 때 남은 시간 1초당 보너스
   tier: Tier; // 성공하면 얻는 칭호
   title: string;
+  /** 게임 지도에 나라 이름을 보여 줄지 (실버·골드). 수능 1등급·지리박사는 이름 없는 백지도 */
+  countryNames: boolean;
 }
 
 /** 문제 수가 많을수록 높은 칭호에 도전 */
 export const CHALLENGES: Challenge[] = [
-  { count: 10, limitSec: 60, speedMax: 100, timeBonusPerSec: 20, tier: tierById('silver'), title: '지리 실버 도전' },
-  { count: 20, limitSec: 90, speedMax: 150, timeBonusPerSec: 30, tier: tierById('gold'), title: '지리 골드 도전' },
-  { count: 40, limitSec: 150, speedMax: 200, timeBonusPerSec: 40, tier: tierById('grade1'), title: '수능 1등급 도전' },
-  { count: 60, limitSec: 300, speedMax: 250, timeBonusPerSec: 50, tier: tierById('doctor'), title: '지리박사 도전' },
+  { count: 10, limitSec: 60, speedMax: 100, timeBonusPerSec: 20, tier: tierById('silver'), title: '지리 실버 도전', countryNames: true },
+  { count: 20, limitSec: 90, speedMax: 150, timeBonusPerSec: 30, tier: tierById('gold'), title: '지리 골드 도전', countryNames: true },
+  { count: 40, limitSec: 150, speedMax: 200, timeBonusPerSec: 40, tier: tierById('grade1'), title: '수능 1등급 도전', countryNames: false },
+  { count: 60, limitSec: 300, speedMax: 250, timeBonusPerSec: 50, tier: tierById('doctor'), title: '지리박사 도전', countryNames: false },
 ];
 export const challengeOf = (count: number | null | undefined) => CHALLENGES.find((c) => c.count === count) ?? null;
 
@@ -97,6 +99,9 @@ export function timeBonusFor(count: ChallengeCount, answered: number, elapsedMs:
   const leftSec = Math.max(0, Math.floor((c.limitSec * 1000 - elapsedMs) / 1000));
   return leftSec * c.timeBonusPerSec;
 }
+
+/** 지도 안내 문구 */
+export const mapStyleLabel = (c: Challenge) => (c.countryNames ? '나라 이름 표시' : '백지도');
 
 export function formatLimit(sec: number): string {
   const m = Math.floor(sec / 60);

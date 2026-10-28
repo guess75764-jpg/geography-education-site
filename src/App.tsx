@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { geoArea } from 'd3-geo';
 import WorldMap, { type MapClick, type MapFocus, type MapLabel, type MapMarker } from './components/WorldMap';
 import LearnPanel from './components/LearnPanel';
 import GamePanel from './components/GamePanel';
@@ -16,9 +17,10 @@ import { useStudy } from './game/useStudy';
 import StudyPanel from './components/StudyPanel';
 import type { ChallengeCount } from './game/scoring';
 import { answerCountryIds } from './lib/concepts';
-import { comboMultiplier } from './game/scoring';
+import { challengeOf, comboMultiplier } from './game/scoring';
 import { fireComboLevelUp, fireCorrect } from './game/fx';
 import { CITIES } from './data/cities';
+import atlas from './data/atlas.json';
 import { colorAt } from './data/palette';
 import type { RankingFilter } from './lib/scores';
 import type { HighlightMap, LearnView, Mode } from './types';
@@ -258,6 +260,16 @@ export default function App() {
 
   // ── 게임 모드 지도: 답한 직후 정답(초록)과 내가 고른 곳(빨강) + 이름표 ──
   // 맞히면 클릭한 곳의 이름, 틀리면 클릭한 곳의 이름과 정답 이름을 지도 위에 띄운다
+  const showGameNames =
+    game.style === 'timeattack' && !!challengeOf(game.challenge)?.countryNames && ['countdown', 'playing', 'answered'].includes(game.phase);
+  const countryArea = useMemo(() => new Map(countries.map((c) => [c.id, geoArea(c.feature)])), [countries]);
+  // 이름을 보여 줄 나라: 수도가 있는 나라 + 어느 정도 큰 땅 (버뮤다 같은 작은 속령, 남극은 제외)
+  const namedCountryIds = useMemo(() => {
+    const withCapital = new Set(atlas.cities.filter((c) => c.capital).map((c) => c.countryId));
+    return new Set(
+      countries.filter((c) => !c.id.startsWith('x-') && c.id !== '010' && (withCapital.has(c.id) || (countryArea.get(c.id) ?? 0) > 0.003)).map((c) => c.id),
+    );
+  }, [countries, countryArea]);
   const gameView = useMemo(() => {
     const highlights: HighlightMap = {};
     const markers: MapMarker[] = [];
@@ -292,10 +304,19 @@ export default function App() {
         }
       }
     }
+    // 지리 실버·골드 도전은 지도에 나라 이름을 보여 준다 (수능 1등급·지리박사는 백지도)
+    if (showGameNames) {
+      for (const l of labels) l.priority = 1e9; // 정답·오답 이름표가 먼저
+      const taken = new Set([...Object.keys(highlights)]);
+      for (const c of countries) {
+        if (!namedCountryIds.has(c.id) || taken.has(c.id)) continue;
+        labels.push({ id: `n-${c.id}`, text: c.nameKo, tone: 'country', countryId: c.id, priority: (countryArea.get(c.id) ?? 0) * 1e5 });
+      }
+    }
     return { highlights, markers, labels };
     // nameOf 는 countryById 에만 의존
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.current, game.lastResult, countryById]);
+  }, [game.current, game.lastResult, countryById, showGameNames, countryArea, namedCountryIds]);
 
   return (
     <div className="app">
@@ -365,6 +386,7 @@ export default function App() {
                     highlights={gameView.highlights}
                     labels={gameView.labels}
                     markers={gameView.markers}
+                    labelMode={showGameNames ? 'hide' : 'shift'}
                     onMapClick={handleMapClick}
                     showTooltip={false}
                   />

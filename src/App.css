@@ -585,3 +585,8 @@ button.link.danger { color: var(--wrong); }
 .atlas-legend .dot.cap { background: #dc2626; }
 .atlas-legend .dot.city { background: #64748b; }
 @media (max-width: 600px) { .tabs button { font-size: 0.75rem; padding: 7px 4px; } }
+
+/* 도전 카드: 지도 방식 표시 */
+.map-style { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-top: 2px; }
+.map-style.named { background: #dbeafe; color: #1d4ed8; }
+.map-style.blank { background: #f1f5f9; color: #475569; }
