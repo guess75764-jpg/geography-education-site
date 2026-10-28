@@ -6,6 +6,7 @@ import GameHud, { type FloatingPoint } from './components/GameHud';
 import ReviewList from './components/ReviewList';
 import RankingPage from './components/RankingPage';
 import HomePage from './components/HomePage';
+import AtlasPage from './components/AtlasPage';
 import AdminPage from './components/admin/AdminPage';
 import Celebration, { usePreloadCharacters } from './components/Celebration';
 import { useWorldData } from './hooks/useWorldData';
@@ -30,6 +31,7 @@ const toggleIn = (list: string[], id: string) => (list.includes(id) ? list.filte
 
 const NAV: [Mode, string][] = [
   ['home', '🏠 홈'],
+  ['atlas', '🗺️ 백지도 학습'],
   ['learn', '📖 학습'],
   ['game', '🎯 게임'],
   ['ranking', '🏆 명예의 전당'],
@@ -312,11 +314,15 @@ export default function App() {
 
       {mode === 'home' ? (
         <main className="page">
-          <HomePage onStart={startFromHome} onStudy={openStudy} onPlay={() => switchMode('game')} />
+          <HomePage onStart={startFromHome} onStudy={openStudy} onPlay={() => switchMode('game')} onAtlas={() => switchMode('atlas')} />
         </main>
       ) : mode === 'admin' ? (
         <main className="page">
           <AdminPage countries={countries} countryById={countryById} onConceptsChanged={concepts.reload} />
+        </main>
+      ) : mode === 'atlas' ? (
+        <main className="layout">
+          <AtlasPage countries={countries} countryById={countryById} />
         </main>
       ) : mode === 'ranking' ? (
         <main className="page narrow">

@@ -38,7 +38,10 @@ export interface MapMarker {
 export interface MapLabel {
   id: string;
   text: string;
-  tone: 'correct' | 'wrong';
+  /** correct·wrong: 둥근 이름표 / country·capital·city: 지도책처럼 글자만 */
+  tone: 'correct' | 'wrong' | 'country' | 'capital' | 'city';
+  /** 겹칠 때 먼저 보여 줄 순서 (클수록 먼저). labelMode 가 'hide' 일 때 쓰임 */
+  priority?: number;
   lon?: number;
   lat?: number;
   countryId?: string;
@@ -80,6 +83,8 @@ interface Props {
   markerScale?: number;
   /** 지도 위 이름표 */
   labels?: MapLabel[];
+  /** 이름표가 겹칠 때: shift = 비켜 놓기(게임), hide = 중요한 것만 보이고 확대하면 더 보임(지도책) */
+  labelMode?: 'shift' | 'hide';
 }
 
 export default function WorldMap({
@@ -92,6 +97,7 @@ export default function WorldMap({
   showTooltip = true,
   markerScale = 1,
   labels = NO_LABELS,
+  labelMode = 'shift',
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -229,38 +235,51 @@ export default function WorldMap({
             );
           })}
           {(() => {
-            // 이름표 위치를 정하고, 화면에서 서로 겹치면 아래로 밀어낸다
+            // 이름표 위치를 정하고, 화면에서 서로 겹치면 비켜 놓거나(shift) 덜 중요한 것을 숨긴다(hide)
             const k = transform.k;
-            const size = 13; // 화면 기준 글자 크기 (확대해도 일정)
-            const h = size + 10;
-            const placed: { x: number; y: number; w: number }[] = [];
-            return labels.map((l) => {
+            const placed: { x: number; y: number; w: number; h: number }[] = [];
+            const overlaps = (x: number, y: number, w: number, h: number) =>
+              placed.find((b) => Math.abs(b.x - x) < (b.w + w) / 2 + 3 && Math.abs(b.y - y) < (b.h + h) / 2 + 2);
+            const ordered = labelMode === 'hide' ? [...labels].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0)) : labels;
+            const out: JSX.Element[] = [];
+            for (const l of ordered) {
               let pt: [number, number] | null = null;
               if (l.lon !== undefined && l.lat !== undefined) pt = projection([l.lon, l.lat]);
               else if (l.countryId) {
                 const c = byId.get(l.countryId);
                 if (c) pt = path.centroid(mainland(c)) as [number, number];
               }
-              if (!pt || !Number.isFinite(pt[0])) return null;
-              const w = textWidth(l.text, size) + 16;
+              if (!pt || !Number.isFinite(pt[0])) continue;
+              const pill = l.tone === 'correct' || l.tone === 'wrong';
+              const size = l.tone === 'country' ? 12.5 : l.tone === 'city' ? 10.5 : l.tone === 'capital' ? 11.5 : 13; // 화면 기준 글자 크기
+              const w = textWidth(l.text, size) + (pill ? 16 : 4);
+              const h = size + (pill ? 10 : 3);
               const sx = pt[0] * k;
               let offset = l.offsetY ?? 0;
-              for (let tries = 0; tries < 8; tries++) {
-                const sy = pt[1] * k + offset;
-                const hit = placed.find((b) => Math.abs(b.x - sx) < (b.w + w) / 2 + 4 && Math.abs(b.y - sy) < h + 4);
-                if (!hit) break;
-                offset += hit.y >= sy ? -(h + 6) : h + 6;
+              if (labelMode === 'hide') {
+                // 화면 밖이면 그리지 않고, 겹치면 숨긴다 (확대하면 자리가 생겨 나타남)
+                const vx = sx + transform.x;
+                const vy = pt[1] * k + offset + transform.y;
+                if (vx < -w || vx > WIDTH + w || vy < -h || vy > HEIGHT + h) continue;
+                if (overlaps(sx, pt[1] * k + offset, w, h)) continue;
+              } else {
+                for (let tries = 0; tries < 8; tries++) {
+                  const hit = overlaps(sx, pt[1] * k + offset, w, h);
+                  if (!hit) break;
+                  offset += hit.y >= pt[1] * k + offset ? -(h + 6) : h + 6;
+                }
               }
-              placed.push({ x: sx, y: pt[1] * k + offset, w });
-              return (
+              placed.push({ x: sx, y: pt[1] * k + offset, w, h });
+              out.push(
                 <g key={l.id} className={`map-label map-label-${l.tone}`} transform={`translate(${pt[0]},${pt[1] + offset / k}) scale(${1 / k})`}>
-                  <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h / 2} />
+                  {pill && <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h / 2} />}
                   <text y={size * 0.36} fontSize={size}>
                     {l.text}
                   </text>
-                </g>
+                </g>,
               );
-            });
+            }
+            return out;
           })()}
         </g>
       </svg>

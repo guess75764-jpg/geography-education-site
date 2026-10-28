@@ -6,10 +6,12 @@ export default function HomePage({
   onStart,
   onStudy,
   onPlay,
+  onAtlas,
 }: {
   onStart: (c: ChallengeCount) => void;
   onStudy: () => void;
   onPlay: () => void;
+  onAtlas: () => void;
 }) {
   return (
     <div className="home">
@@ -62,6 +64,11 @@ export default function HomePage({
 
           <h3>더 해 보기</h3>
           <div className="mode-card-grid">
+            <button className="mode-card" onClick={onAtlas}>
+              <span className="mode-emoji">🗺️</span>
+              <strong>백지도 학습</strong>
+              <span className="muted small">대륙별 나라·도시 이름 익히기</span>
+            </button>
             <button className="mode-card" onClick={onStudy}>
               <span className="mode-emoji">📝</span>
               <strong>개념 공부</strong>

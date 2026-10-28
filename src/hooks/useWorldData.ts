@@ -13,7 +13,18 @@ isoCountries.registerLocale(ko);
 // 브라우저 내장 국가명(짧은 이름: "짐바브웨")을 우선 쓰고, 없으면 라이브러리 이름("짐바브웨 공화국")을 쓴다.
 const regionNames = new Intl.DisplayNames(['ko'], { type: 'region' });
 
+/** 브라우저 표기 대신 교과서 표기를 쓰는 나라 */
+const TEXTBOOK_NAMES: Record<string, string> = {
+  '180': '콩고 민주 공화국',
+  '178': '콩고',
+  '710': '남아프리카 공화국',
+  '446': '마카오',
+  '344': '홍콩',
+  '275': '팔레스타인',
+};
+
 function koreanName(numericId: string): string | undefined {
+  if (TEXTBOOK_NAMES[numericId]) return TEXTBOOK_NAMES[numericId];
   const alpha2 = isoCountries.numericToAlpha2(numericId);
   const short = alpha2 ? regionNames.of(alpha2) : undefined;
   if (short && short !== alpha2) return short;

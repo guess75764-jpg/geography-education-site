@@ -92,7 +92,7 @@ button.link.danger { color: var(--wrong); }
 
 /* ───────────────────────── 지도 ───────────────────────── */
 .map-area { position: relative; }
-.map-wrap { position: relative; background: var(--panel); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); }
+.map-wrap { position: relative; background: var(--ocean); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); }
 .world-map { display: block; width: 100%; height: auto; cursor: grab; touch-action: none; }
 .world-map:active { cursor: grabbing; }
 .ocean { fill: var(--ocean); }
@@ -553,3 +553,35 @@ button.link.danger { color: var(--wrong); }
 .map-label-wrong rect { fill: #dc2626; stroke: #fff; }
 .map-label-wrong text { fill: #fff; }
 @keyframes label-pop { from { opacity: 0; } to { opacity: 1; } }
+/* 지도책 글자: 흰 테두리로 지도 위에서도 잘 읽히게 */
+.map-label-country text, .map-label-capital text, .map-label-city text { paint-order: stroke; stroke: #fff; stroke-width: 3.2px; stroke-linejoin: round; }
+.map-label-country text { fill: #1e293b; font-weight: 800; letter-spacing: -0.02em; }
+.map-label-capital text { fill: #b91c1c; font-weight: 700; }
+.map-label-city text { fill: #475569; font-weight: 600; }
+.map-label-country, .map-label-capital, .map-label-city { animation: none; }
+
+/* ── 백지도 학습 ── */
+.continent-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.continent-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 2px solid var(--border); background: #fff; font-weight: 700; font-size: 0.85rem; }
+.continent-btn span { font-size: 1.3rem; }
+.continent-btn.active { border-color: var(--primary); background: #eff6ff; color: var(--primary); }
+.atlas-options { display: flex; flex-direction: column; gap: 8px; }
+.small-seg button { font-size: 0.8rem; padding: 6px 4px; }
+.hide-toggle { font-weight: 700; }
+.atlas-card { border-radius: 12px; padding: 12px 14px; background: linear-gradient(135deg, #eff6ff, #f5f3ff); border: 1px solid #c7d2fe; }
+.atlas-card h3 { margin: 0; font-size: 1.3rem; }
+.atlas-card p { margin: 2px 0 6px; }
+.atlas-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.9rem; }
+.atlas-search { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; }
+.atlas-list { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.atlas-list button { width: 100%; display: flex; justify-content: space-between; gap: 8px; border: 0; background: none; padding: 6px 8px; border-radius: 8px; text-align: left; }
+.atlas-list button:hover { background: #f1f5f9; }
+.atlas-list button.on { background: #dbeafe; }
+.atlas-list .nm { font-weight: 700; }
+.hide-progress { display: flex; flex-direction: column; gap: 8px; }
+.hide-progress p { margin: 0; }
+.atlas-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 0.8rem; padding: 6px 4px 0; }
+.atlas-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #cbd5e1; }
+.atlas-legend .dot.cap { background: #dc2626; }
+.atlas-legend .dot.city { background: #64748b; }
+@media (max-width: 600px) { .tabs button { font-size: 0.75rem; padding: 7px 4px; } }
