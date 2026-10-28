@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { geoArea } from 'd3-geo';
+import { areaOf } from '../lib/geoCache';
 import WorldMap, { type MapClick, type MapFocus, type MapLabel, type MapMarker } from './WorldMap';
 import atlas from '../data/atlas.json';
 import type { Country } from '../types';
@@ -57,7 +57,7 @@ export default function AtlasPage({ countries, countryById }: { countries: Count
     () =>
       countries
         .filter((c) => (COUNTRY_CONTINENTS[c.id] ?? []).includes(continent))
-        .filter((c) => hasCapital.has(c.id) || geoArea(c.feature) > 0.0003)
+        .filter((c) => hasCapital.has(c.id) || areaOf(c) > 0.0003)
         .sort((a, b) => a.nameKo.localeCompare(b.nameKo, 'ko')),
     [countries, continent, hasCapital],
   );
@@ -72,7 +72,7 @@ export default function AtlasPage({ countries, countryById }: { countries: Count
     for (const c of contCities) if (c.capital) m.set(c.countryId, m.has(c.countryId) ? `${m.get(c.countryId)}·${c.nameKo}` : c.nameKo);
     return m;
   }, [contCities]);
-  const area = useMemo(() => new Map(countries.map((c) => [c.id, geoArea(c.feature)])), [countries]);
+  const area = useMemo(() => new Map(countries.map((c) => [c.id, areaOf(c)])), [countries]);
 
   const changeContinent = (id: ContinentId) => {
     setContinent(id);

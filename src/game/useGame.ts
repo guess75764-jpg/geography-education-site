@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { geoArea, geoDistance } from 'd3-geo';
+import { geoDistance } from 'd3-geo';
+import { areaOf } from '../lib/geoCache';
 import type { City, Country } from '../types';
 import type { GeoHint } from '../data/hints';
 import { CITY_TOLERANCE_KM, FEEDBACK_MS, PRACTICE_COUNT, challengeOf, pointsFor, timeBonusFor, type ChallengeCount } from './scoring';
@@ -93,7 +94,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
   const countryQuestions = useMemo<Question[]>(
     () =>
       countries
-        .filter((c) => !c.id.startsWith('x-') && !EXCLUDED_COUNTRY_IDS.has(c.id) && geoArea(c.feature) >= MIN_COUNTRY_AREA)
+        .filter((c) => !c.id.startsWith('x-') && !EXCLUDED_COUNTRY_IDS.has(c.id) && areaOf(c) >= MIN_COUNTRY_AREA)
         .map((c) => ({ key: `c:${c.id}`, target: { type: 'country', countryId: c.id }, answerName: c.nameKo, label: '국가' })),
     [countries],
   );

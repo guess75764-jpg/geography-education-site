@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { geoArea } from 'd3-geo';
+import { areaOf, warmGeoCache } from './lib/geoCache';
 import WorldMap, { type MapClick, type MapFocus, type MapLabel, type MapMarker } from './components/WorldMap';
 import LearnPanel from './components/LearnPanel';
 import GamePanel from './components/GamePanel';
@@ -262,7 +262,8 @@ export default function App() {
   // 맞히면 클릭한 곳의 이름, 틀리면 클릭한 곳의 이름과 정답 이름을 지도 위에 띄운다
   const showGameNames =
     game.style === 'timeattack' && !!challengeOf(game.challenge)?.countryNames && ['countdown', 'playing', 'answered'].includes(game.phase);
-  const countryArea = useMemo(() => new Map(countries.map((c) => [c.id, geoArea(c.feature)])), [countries]);
+  useEffect(() => warmGeoCache(countries), [countries]);
+  const countryArea = useMemo(() => new Map(countries.map((c) => [c.id, areaOf(c)])), [countries]);
   // 이름을 보여 줄 나라: 수도가 있는 나라 + 어느 정도 큰 땅 (버뮤다 같은 작은 속령, 남극은 제외)
   const namedCountryIds = useMemo(() => {
     const withCapital = new Set(atlas.cities.filter((c) => c.capital).map((c) => c.countryId));

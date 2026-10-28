@@ -1,10 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { geoArea, geoGraticule10, geoEqualEarth, geoPath, type GeoPath } from 'd3-geo';
+import { geoGraticule10, geoEqualEarth, geoPath, type GeoPath } from 'd3-geo';
 import { pointer, select } from 'd3-selection';
 import { zoom, zoomIdentity, type ZoomBehavior, type ZoomTransform } from 'd3-zoom';
 import 'd3-transition'; // selection.transition() 을 활성화
-import type { Feature, MultiPolygon, Polygon } from 'geojson';
 import type { Country, HighlightMap } from '../types';
+import { mainlandOf } from '../lib/geoCache';
 
 // SVG 내부 좌표계 크기. 실제 화면 크기는 CSS(width:100%)로 맞춘다.
 // 이퀄 어스(Equal Earth) 도법: 나라 면적 비율이 실제와 같아 왜곡이 적다.
@@ -87,7 +87,15 @@ interface Props {
   labelMode?: 'shift' | 'hide';
 }
 
-export default function WorldMap({
+/** 타이머 등으로 부모가 자주 다시 그려져도, 지도에 넘기는 값이 같으면 다시 그리지 않는다 */
+export default memo(WorldMap, (a, b) => {
+  // onMapClick 은 ref 로 최신 값을 쓰므로 비교하지 않는다
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof Props>;
+  for (const k of keys) if (k !== 'onMapClick' && a[k] !== b[k]) return false;
+  return true;
+});
+
+function WorldMap({
   countries,
   highlights = NO_HIGHLIGHTS,
   fillColors = NO_FILLS,
@@ -112,6 +120,20 @@ export default function WorldMap({
   }, []);
 
   const byId = useMemo(() => new Map(countries.map((c) => [c.id, c])), [countries]);
+  const graticule = useMemo(() => path(geoGraticule10()) ?? '', [path]);
+  // 나라 이름표 위치(본토 가운데)는 계산이 무거우므로 한 번만 계산해 둔다
+  const anchorCache = useMemo(() => new Map<string, [number, number] | null>(), [countries, path]);
+  const anchorOf = (id: string): [number, number] | null => {
+    if (!anchorCache.has(id)) {
+      const c = byId.get(id);
+      const pt = c ? (path.centroid(mainlandOf(c)) as [number, number]) : null;
+      anchorCache.set(id, pt && Number.isFinite(pt[0]) ? pt : null);
+    }
+    return anchorCache.get(id)!;
+  };
+  // 클릭 처리 함수가 바뀌어도 지도를 다시 그리지 않도록 최신 함수를 ref 로 들고 있는다
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   // 확대/이동(드래그, 휠, 핀치) 설정
   useEffect(() => {
@@ -146,7 +168,7 @@ export default function WorldMap({
     for (const id of focus.countryIds) {
       const c = byId.get(id);
       if (!c) continue;
-      const [[ax, ay], [bx, by]] = path.bounds(mainland(c));
+      const [[ax, ay], [bx, by]] = path.bounds(mainlandOf(c));
       include(ax, ay, bx, by);
     }
     for (const p of focus.points) {
@@ -169,6 +191,7 @@ export default function WorldMap({
   }, [focus, byId, path, projection]);
 
   const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    const onMapClick = onMapClickRef.current;
     if (!onMapClick || !gRef.current) return;
     // 클릭 좌표 → (줌 변환 역적용) → 투영 역변환 → 경도/위도
     const [x, y] = pointer(e.nativeEvent, gRef.current);
@@ -202,7 +225,7 @@ export default function WorldMap({
         <g ref={gRef} transform={transform.toString()}>
           {/* 네모난 바다 배경 (지구 바깥 모서리까지 바다색) */}
           <rect className="ocean" x={0} y={0} width={WIDTH} height={HEIGHT} />
-          <path className="graticule" d={path(geoGraticule10()) ?? ''} />
+          <path className="graticule" d={graticule} />
           <CountryLayer
             countries={countries}
             path={path}
@@ -245,10 +268,7 @@ export default function WorldMap({
             for (const l of ordered) {
               let pt: [number, number] | null = null;
               if (l.lon !== undefined && l.lat !== undefined) pt = projection([l.lon, l.lat]);
-              else if (l.countryId) {
-                const c = byId.get(l.countryId);
-                if (c) pt = path.centroid(mainland(c)) as [number, number];
-              }
+              else if (l.countryId) pt = anchorOf(l.countryId);
               if (!pt || !Number.isFinite(pt[0])) continue;
               const pill = l.tone === 'correct' || l.tone === 'wrong';
               const size = l.tone === 'country' ? 12.5 : l.tone === 'city' ? 10.5 : l.tone === 'capital' ? 11.5 : 13; // 화면 기준 글자 크기
@@ -287,16 +307,6 @@ export default function WorldMap({
       <div className="map-hint">드래그: 이동 · 휠/핀치: 확대</div>
     </div>
   );
-}
-
-/** 해외 영토가 있는 나라(프랑스 등)는 가장 큰 땅덩어리 기준으로 확대한다. */
-function mainland(country: Country): Feature<Polygon | MultiPolygon> {
-  const g = country.feature.geometry;
-  if (g.type !== 'MultiPolygon') return country.feature;
-  const polys = g.coordinates.map(
-    (coordinates): Feature<Polygon> => ({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates } }),
-  );
-  return polys.reduce((a, b) => (geoArea(b) > geoArea(a) ? b : a));
 }
 
 /**
