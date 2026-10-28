@@ -17,7 +17,9 @@ export const QUIZ_TYPE_LABEL: Record<QuizType, string> = {
 };
 
 /** 나라 정답은 여러 개일 수 있다 (altIds 중 하나를 골라도 정답) */
-export type Target = { type: 'country'; countryId: string; altIds?: string[] } | { type: 'point'; lon: number; lat: number };
+export type Target =
+  | { type: 'country'; countryId: string; altIds?: string[] }
+  | { type: 'point'; lon: number; lat: number; countryId?: string }; // 도시: 좌표 + 그 도시가 있는 나라
 
 /** 이 나라를 고르면 정답인지 */
 export const isTargetCountry = (t: Target, id: string | null) =>
@@ -99,7 +101,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
     () =>
       cities.map((c) => ({
         key: `p:${c.id}`,
-        target: { type: 'point', lon: c.lon, lat: c.lat },
+        target: { type: 'point', lon: c.lon, lat: c.lat, countryId: c.countryId },
         answerName: c.nameKo,
         label: '도시',
       })),
@@ -112,7 +114,7 @@ export function useGame(countries: Country[], cities: City[], hints: GeoHint[]) 
         key: `h:${h.id}`,
         target:
           h.kind === 'city' && h.lon !== undefined && h.lat !== undefined
-            ? { type: 'point', lon: h.lon, lat: h.lat }
+            ? { type: 'point', lon: h.lon, lat: h.lat, countryId: h.countryId }
             : { type: 'country', countryId: h.countryId, altIds: h.altCountryIds ?? [] },
         // 복수 정답이면 "아르헨티나 또는 우루과이"
         answerName:

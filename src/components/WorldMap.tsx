@@ -34,6 +34,23 @@ export interface MapMarker {
   color?: string; // tone 색 대신 쓸 색
 }
 
+/** 지도 위 이름표 (예: 클릭한 나라 ✗ 브라질, 정답 아르헨티나). 좌표 또는 나라(가운데)에 붙인다 */
+export interface MapLabel {
+  id: string;
+  text: string;
+  tone: 'correct' | 'wrong';
+  lon?: number;
+  lat?: number;
+  countryId?: string;
+  /** 화면 기준 세로 위치 조정(px). 클릭 지점 바로 위·아래에 띄울 때 */
+  offsetY?: number;
+}
+
+const NO_LABELS: MapLabel[] = [];
+
+/** 이름표 글자 폭 대충 계산 (한글은 1em, 영문·숫자·기호는 0.6em) */
+const textWidth = (t: string, size: number) => [...t].reduce((w, ch) => w + (/[\u3131-\uD79D\u2700-\u27BF]/.test(ch) ? size : size * 0.62), 0);
+
 export interface MapClick {
   country: Country | null; // 바다를 클릭하면 null
   lonLat: [number, number] | null; // 클릭한 지점의 경도/위도
@@ -61,6 +78,8 @@ interface Props {
   showTooltip?: boolean;
   /** 도시 점 크기 배율 (도시 지도에서는 크게) */
   markerScale?: number;
+  /** 지도 위 이름표 */
+  labels?: MapLabel[];
 }
 
 export default function WorldMap({
@@ -72,6 +91,7 @@ export default function WorldMap({
   onMapClick,
   showTooltip = true,
   markerScale = 1,
+  labels = NO_LABELS,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -208,6 +228,40 @@ export default function WorldMap({
               </g>
             );
           })}
+          {(() => {
+            // 이름표 위치를 정하고, 화면에서 서로 겹치면 아래로 밀어낸다
+            const k = transform.k;
+            const size = 13; // 화면 기준 글자 크기 (확대해도 일정)
+            const h = size + 10;
+            const placed: { x: number; y: number; w: number }[] = [];
+            return labels.map((l) => {
+              let pt: [number, number] | null = null;
+              if (l.lon !== undefined && l.lat !== undefined) pt = projection([l.lon, l.lat]);
+              else if (l.countryId) {
+                const c = byId.get(l.countryId);
+                if (c) pt = path.centroid(mainland(c)) as [number, number];
+              }
+              if (!pt || !Number.isFinite(pt[0])) return null;
+              const w = textWidth(l.text, size) + 16;
+              const sx = pt[0] * k;
+              let offset = l.offsetY ?? 0;
+              for (let tries = 0; tries < 8; tries++) {
+                const sy = pt[1] * k + offset;
+                const hit = placed.find((b) => Math.abs(b.x - sx) < (b.w + w) / 2 + 4 && Math.abs(b.y - sy) < h + 4);
+                if (!hit) break;
+                offset += hit.y >= sy ? -(h + 6) : h + 6;
+              }
+              placed.push({ x: sx, y: pt[1] * k + offset, w });
+              return (
+                <g key={l.id} className={`map-label map-label-${l.tone}`} transform={`translate(${pt[0]},${pt[1] + offset / k}) scale(${1 / k})`}>
+                  <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={h / 2} />
+                  <text y={size * 0.36} fontSize={size}>
+                    {l.text}
+                  </text>
+                </g>
+              );
+            });
+          })()}
         </g>
       </svg>
       {showTooltip && hovered && <div className="map-tooltip">{hovered}</div>}

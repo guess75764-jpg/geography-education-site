@@ -543,3 +543,13 @@ button.link.danger { color: var(--wrong); }
 .source { margin: 0; word-break: keep-all; }
 .alt-chip { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; border-color: #93c5fd; color: #1e40af; font-weight: 700; font-size: 0.85rem; }
 .alt-chip button { border: 0; background: none; color: inherit; padding: 0 2px; font-size: 1rem; line-height: 1; }
+
+/* ── 지도 위 이름표 (클릭한 곳 / 정답) ── */
+.map-label { pointer-events: none; animation: label-pop 0.25s ease-out; }
+.map-label rect { stroke-width: 2; filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.25)); }
+.map-label text { text-anchor: middle; font-weight: 800; }
+.map-label-correct rect { fill: #16a34a; stroke: #fff; }
+.map-label-correct text { fill: #fff; }
+.map-label-wrong rect { fill: #dc2626; stroke: #fff; }
+.map-label-wrong text { fill: #fff; }
+@keyframes label-pop { from { opacity: 0; } to { opacity: 1; } }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import WorldMap, { type MapClick, type MapFocus, type MapMarker } from './components/WorldMap';
+import WorldMap, { type MapClick, type MapFocus, type MapLabel, type MapMarker } from './components/WorldMap';
 import LearnPanel from './components/LearnPanel';
 import GamePanel from './components/GamePanel';
 import GameHud, { type FloatingPoint } from './components/GameHud';
@@ -143,7 +143,10 @@ export default function App() {
     setFloats((fs) => [...fs, { id, x, y, text: r.correct ? `+${r.points}` : 'MISS', good: r.correct }]);
     // 팝업마다 1초 뒤 사라짐 (다음 문제로 넘어가도 취소하지 않음)
     setTimeout(() => setFloats((fs) => fs.filter((f) => f.id !== id)), 1000);
-    if (!r.correct) return;
+    if (!r.correct) {
+      setCheer(null); // 틀리면 앞 문제의 축하 캐릭터는 바로 내린다
+      return;
+    }
     fireCorrect(clientX, clientY, r.combo);
     if (comboMultiplier(r.combo) > comboMultiplier(r.combo - 1)) fireComboLevelUp();
     setCheer({ id, combo: r.combo });
@@ -199,26 +202,43 @@ export default function App() {
     return [...unselected, ...selected]; // 선택한 점이 위에 그려지도록
   }, [selCities, countryById]);
 
-  // ── 개념 공부 지도: 틀리면 고른 곳 빨강, 맞히거나 정답 보기면 정답 초록 + 그쪽으로 확대 ──
+  // 나라 코드 → 한국어 이름 (지도 이름표용)
+  const nameOf = (id: string | null | undefined) => (id ? countryById.get(id)?.nameKo ?? null : null);
+  // ── 개념 공부 지도: 틀리면 고른 곳 빨강(다시 고를 수 있게 정답은 숨김), 맞히거나 정답 보기면 정답 초록 + 이름표 ──
   const studyView = useMemo(() => {
     const highlights: HighlightMap = {};
     const markers: MapMarker[] = [];
+    const labels: MapLabel[] = [];
     const h = study.current;
     const c = study.lastClick;
     const done = study.status === 'correct' || study.status === 'revealed';
     if (h) {
       const isPoint = h.kind === 'city' && h.lon !== undefined && h.lat !== undefined;
+      const clickedAt = c?.lonLat ? { lon: c.lonLat[0], lat: c.lonLat[1] } : null;
+      const clickedName = nameOf(c?.countryId);
       if (study.status === 'wrong' && c) {
-        if (isPoint && c.lonLat) markers.push({ id: 'clicked', lon: c.lonLat[0], lat: c.lonLat[1], tone: 'wrong' });
+        if (isPoint && clickedAt) markers.push({ id: 'clicked', ...clickedAt, tone: 'wrong' });
         else if (c.countryId) highlights[c.countryId] = 'wrong';
+        if (clickedAt) labels.push({ id: 'clicked', text: `✗ ${clickedName ?? '바다'}`, tone: 'wrong', ...clickedAt, offsetY: 22 });
       }
       if (done) {
-        if (isPoint) markers.push({ id: 'answer', lon: h.lon!, lat: h.lat!, tone: 'correct', label: h.answer });
-        else for (const id of answerCountryIds(h)) highlights[id] = 'correct'; // 복수 정답이면 모두 초록
+        const cityCountry = nameOf(h.countryId);
+        if (isPoint) {
+          markers.push({ id: 'answer', lon: h.lon!, lat: h.lat!, tone: 'correct' });
+          labels.push({ id: 'answer', text: `${study.status === 'correct' ? '✓ ' : '정답 '}${h.answer}${cityCountry ? ` (${cityCountry})` : ''}`, tone: 'correct', lon: h.lon!, lat: h.lat!, offsetY: -22 });
+        } else {
+          for (const id of answerCountryIds(h)) highlights[id] = 'correct'; // 복수 정답이면 모두 초록
+          if (study.status === 'correct' && clickedAt) {
+            labels.push({ id: 'clicked', text: `✓ ${clickedName}`, tone: 'correct', ...clickedAt, offsetY: 22 });
+          } else {
+            for (const id of answerCountryIds(h)) labels.push({ id: `answer-${id}`, text: `정답 ${nameOf(id) ?? ''}`, tone: 'correct', countryId: id });
+          }
+        }
       }
     }
-    return { highlights, markers };
-  }, [study.current, study.lastClick, study.status]);
+    return { highlights, markers, labels };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [study.current, study.lastClick, study.status, countryById]);
   const [studyFocus, setStudyFocus] = useState<MapFocus | null>(null);
   useEffect(() => {
     const h = study.current;
@@ -234,25 +254,46 @@ export default function App() {
     }
   }, [study.current, study.status]);
 
-  // ── 게임 모드 지도 색/점: 답한 직후 정답(초록)과 내가 고른 곳(빨강) ──
+  // ── 게임 모드 지도: 답한 직후 정답(초록)과 내가 고른 곳(빨강) + 이름표 ──
+  // 맞히면 클릭한 곳의 이름, 틀리면 클릭한 곳의 이름과 정답 이름을 지도 위에 띄운다
   const gameView = useMemo(() => {
     const highlights: HighlightMap = {};
     const markers: MapMarker[] = [];
+    const labels: MapLabel[] = [];
     const q = game.current;
     const a = game.lastResult;
     if (q && a) {
+      const clickedName = nameOf(a.clickedCountryId);
+      const clickedAt = a.clickedLonLat ? { lon: a.clickedLonLat[0], lat: a.clickedLonLat[1] } : null;
       if (q.target.type === 'country') {
-        for (const id of [q.target.countryId, ...(q.target.altIds ?? [])]) highlights[id] = 'correct';
-        if (!a.correct && a.clickedCountryId) highlights[a.clickedCountryId] = 'wrong';
+        const answers = [q.target.countryId, ...(q.target.altIds ?? [])];
+        for (const id of answers) highlights[id] = 'correct';
+        if (a.correct) {
+          if (clickedAt) labels.push({ id: 'clicked', text: `✓ ${clickedName}`, tone: 'correct', ...clickedAt, offsetY: 22 });
+        } else {
+          if (a.clickedCountryId) highlights[a.clickedCountryId] = 'wrong';
+          if (clickedAt) labels.push({ id: 'clicked', text: `✗ ${clickedName ?? '바다'}`, tone: 'wrong', ...clickedAt, offsetY: 22 });
+          for (const id of answers) labels.push({ id: `answer-${id}`, text: `정답 ${nameOf(id) ?? ''}`, tone: 'correct', countryId: id });
+        }
       } else {
-        markers.push({ id: 'answer', lon: q.target.lon, lat: q.target.lat, tone: 'correct', label: q.answerName });
-        if (!a.correct && a.clickedLonLat) {
-          markers.push({ id: 'clicked', lon: a.clickedLonLat[0], lat: a.clickedLonLat[1], tone: 'wrong' });
+        const { lon, lat } = q.target;
+        const cityCountry = nameOf(q.target.countryId);
+        markers.push({ id: 'answer', lon, lat, tone: 'correct' });
+        if (a.correct) {
+          labels.push({ id: 'answer', text: `✓ ${q.answerName}${cityCountry ? ` (${cityCountry})` : ''}`, tone: 'correct', lon, lat, offsetY: -22 });
+        } else {
+          if (clickedAt) {
+            markers.push({ id: 'clicked', ...clickedAt, tone: 'wrong' });
+            labels.push({ id: 'clicked', text: `✗ ${clickedName ?? '바다'}`, tone: 'wrong', ...clickedAt, offsetY: 22 });
+          }
+          labels.push({ id: 'answer', text: `정답 ${q.answerName}${cityCountry ? ` (${cityCountry})` : ''}`, tone: 'correct', lon, lat, offsetY: -22 });
         }
       }
     }
-    return { highlights, markers };
-  }, [game.current, game.lastResult]);
+    return { highlights, markers, labels };
+    // nameOf 는 countryById 에만 의존
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.current, game.lastResult, countryById]);
 
   return (
     <div className="app">
@@ -293,6 +334,7 @@ export default function App() {
                   key="learn-study"
                   countries={countries}
                   highlights={studyView.highlights}
+                  labels={studyView.labels}
                   markers={studyView.markers}
                   focus={studyFocus}
                   onMapClick={handleMapClick}
@@ -315,6 +357,7 @@ export default function App() {
                     key="game"
                     countries={countries}
                     highlights={gameView.highlights}
+                    labels={gameView.labels}
                     markers={gameView.markers}
                     onMapClick={handleMapClick}
                     showTooltip={false}
